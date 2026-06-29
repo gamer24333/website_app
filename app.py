@@ -3,10 +3,10 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-@app.route('/', methods=['POST'])
+@app.route('/')
 def home():
     return """
-    
+    <a href="/upload" style="color:white;">weiter</a>
     """
 
 @app.route('/upload', methods=['POST'])
