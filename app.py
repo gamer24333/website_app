@@ -96,7 +96,7 @@ def upload():
     
     if lat is not None and lon is not None:
         # Speichere die Koordinaten als Dictionary im Dictionary
-        geraete_daten[geraete_name] = {{"lat": lat, "lon": lon}}
+        geraete_daten[geraete_name] = {"lat": lat, "lon": lon}
         print(f"Position erhalten von {geraete_name}: {lat}, {lon}", flush=True)
         return jsonify({"status": "success"}), 200
     
