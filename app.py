@@ -82,7 +82,7 @@ def index():
 
 @app.route('/download', methods=['GET'])
 def download_apk():
-    return send_from_directory(directory='static', path='app.apk', as_attachment=True)
+    return send_from_directory(directory='static', path='app-debug.apk', as_attachment=True)
 
 @app.route('/upload', methods=['POST'])
 def upload():
