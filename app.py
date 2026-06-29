@@ -20,7 +20,8 @@ def index():
     <html>
         <head>
             <title>Live GPS Tracker</title>
-            <meta http-equiv="refresh" content="5"> <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <meta http-equiv="refresh" content="5"> 
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             
             <style>
@@ -50,12 +51,12 @@ def index():
                 let centerLon = 10.4515;
                 let zoomLevel = 5;
 
-                # Wenn Geräte vorhanden sind, zentrieren wir die Karte auf das erste Gerät
+                // REPARIERT: Richtiger JavaScript-Kommentar verwendet
                 const keys = Object.keys(geraete);
                 if (keys.length > 0) {{
                     centerLat = geraete[keys[0]].lat;
                     centerLon = geraete[keys[0]].lon;
-                    zoomLevel = 13; // Näher heranzoomen
+                    zoomLevel = 13;
                 }}
 
                 // Karte initialisieren
@@ -95,7 +96,6 @@ def upload():
     lon = data.get("lon")
     
     if lat is not None and lon is not None:
-        # Speichere die Koordinaten als Dictionary im Dictionary
         geraete_daten[geraete_name] = {"lat": lat, "lon": lon}
         print(f"Position erhalten von {geraete_name}: {lat}, {lon}", flush=True)
         return jsonify({"status": "success"}), 200
