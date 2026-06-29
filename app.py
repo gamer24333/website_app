@@ -3,6 +3,12 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
+@app.route('/', methods=['POST'])
+def home():
+    return """
+    
+    """
+
 @app.route('/upload', methods=['POST'])
 def upload():
     # Überprüfen, ob Daten im JSON-Format gesendet wurden
