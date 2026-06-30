@@ -86,14 +86,11 @@ def index():
 
             let markerMap = {{}};
 
-            // Aktualisiert die Marker und die Geräteliste mit Lösch-Knöpfen
             function updateUI(daten) {{
-                geraete = daten; // Global updaten
+                geraete = daten;
                 
-                // 1. MARKER AKTUALISIEREN
                 for (const name in daten) {{
                     const info = daten[name];
-                    
                     if (markerMap[name]) {{
                         markerMap[name].setLatLng([info.lat, info.lon]);
                         markerMap[name].getPopup().setContent("<b>" + name + "</b><br>Lat: " + info.lat + "<br>Lon: " + info.lon);
@@ -112,7 +109,6 @@ def index():
                     }}
                 }}
 
-                // 2. GERÄTELISTE MIT LÖSCH-KNÖPFEN UND HANDY-STATUS NEU ZEICHNEN
                 const container = document.getElementById('geraete-liste-container');
                 const gerateKeys = Object.keys(daten);
                 
@@ -154,18 +150,32 @@ def index():
                 container.innerHTML = html;
             }}
 
-            // Initiales Zeichnen beim Laden der Seite
             updateUI(geraete);
 
-            // --- LIVE-TIMING FÜR DIE TEXTE ---
-            let sekundenSeitUpdate = 0;
-            let sekundenBisUpdate = 300; 
+            // --- NEUE LOGIK: ZEITEN AUS DEM SPEICHER LESEN ODER INITIALISIEREN ---
+            const JETZT_ZEIT = Math.floor(Date.now() / 1000);
+            
+            // Prüfen, wann der allerletzte erfolgreiche Server-Abruf war
+            let letzterErfolgreicherAbruf = localStorage.getItem('letzterAbrufZeitstempel');
+            
+            if (!letzterErfolgreicherAbruf) {{
+                // Falls die Seite zum allerersten Mal geöffnet wird
+                letzterErfolgreicherAbruf = JETZT_ZEIT;
+                localStorage.setItem('letzterAbrufZeitstempel', letzterErfolgreicherAbruf);
+            }}
 
+            // Berechnen, wie viele Sekunden seit dem echten letzten Abruf vergangen sind
+            let sekundenSeitUpdate = JETZT_ZEIT - parseInt(letzterErfolgreicherAbruf);
+            
+            // Das nächste Update soll genau 300 Sekunden (5 Min) nach dem letzten Abruf stattfinden
+            let sekundenBisUpdate = 300 - (sekundenSeitUpdate % 300);
+
+            // Der Sekunden-Taktzer
             setInterval(function() {{
                 sekundenSeitUpdate++;
                 sekundenBisUpdate--;
 
-                // Webseiten-Update-Text
+                // 1. Webseiten-Update-Text (Stoppuhr seit letztem Abruf)
                 let seitText = "";
                 if (sekundenSeitUpdate < 60) {{
                     seitText = sekundenSeitUpdate + " Sek.";
@@ -176,18 +186,19 @@ def index():
                 }}
                 document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + seitText;
 
-                // Countdown-Text
+                // 2. Countdown-Text (Wann wird wieder automatisch im Hintergrund abgefragt)
                 let bisMin = Math.floor(sekundenBisUpdate / 60);
                 let bisSek = sekundenBisUpdate % 60;
                 document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: " + (bisMin < 10 ? "0" : "") + bisMin + ":" + (bisSek < 10 ? "0" : "") + bisSek;
 
-                // Jede Sekunde auch die Handy-Zeitstempel-Texte neu berechnen (damit sie flüssig hochzählen)
+                // UI für die Handys aktualisieren
                 updateUI(geraete);
 
+                // Wenn der Countdown abläuft, neue Daten holen
                 if (sekundenBisUpdate <= 0) {{
                     datenVomServerHolen();
                 }}
-            }}, 1000); // <-- HIER: doppelte {{ }} wegen Python f-String!
+            }, 1000);
 
             function datenVomServerHolen() {{
                 fetch('/api/data')
@@ -200,15 +211,22 @@ def index():
                     .then(neueDaten => {{
                         console.log("Hintergrund-Update durchgeführt:", neueDaten);
                         updateUI(neueDaten);
+                        
+                        // Zeitstempel für den Erfolg dauerhaft im Browser merken
+                        const neuerZeitstempel = Math.floor(Date.now() / 1000);
+                        localStorage.setItem('letzterAbrufZeitstempel', neuerZeitstempel);
+                        
+                        // Timer zurücksetzen
                         sekundenSeitUpdate = 0;
                         sekundenBisUpdate = 300; 
                         document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     }})
                     .catch(err => {{
                         console.error("Fehler beim Live-Update:", err);
+                        // Bei Fehlern in 5 Sekunden noch mal probieren
                         sekundenBisUpdate = 5; 
                     }});
-            }} // <-- HIER AUCH: doppelte 
+            }}
         </script>
         """
 
