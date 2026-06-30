@@ -7,24 +7,17 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Ein zufälliger Schlüssel, den Flask braucht, um Passwörter im Browser sicher zu merken
 app.secret_key = os.environ.get("SECRET_KEY", "ein_zufaelliger_geheimer_schluessel_123")
-
-# LEGE HIER DEIN PASSWORT FEST:
 GEHEIMES_PASSWORT = "192837465"
 
-# Speichert die Live-Daten der Geräte inklusive Zeitstempel, Akku, Speed und Netzwerk
+# Speichert die Live-Daten der Geräte inklusive Historie
 geraete_daten = {}
 
-# 1. HAUPTSEITE (Download für alle, Karte nur mit Passwort)
 @app.route('/', methods=['GET'])
 def index():
     global geraete_daten
-    
-    # Prüfen, ob der Nutzer bereits eingeloggt ist
     ist_eingeloggt = session.get('eingeloggt', False)
     
-    # HTML-Teil für das Login-Formular (falls nicht eingeloggt)
     login_html = ""
     if not ist_eingeloggt:
         login_html = """
@@ -39,7 +32,6 @@ def index():
         </div>
         """
     
-    # HTML-Teil für die Karte (wird nur geladen, wenn eingeloggt)
     karte_html = ""
     javascript_html = ""
     if ist_eingeloggt:
@@ -47,7 +39,7 @@ def index():
         karte_html = """
         <div class="container animate-fade">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <h1>🗺️ Live-Standorte aller Geräte</h1>
+                <h1>🗺️ Live-Standorte & Routen aller Geräte</h1>
                 <a href="/logout" style="color: #dc3545; text-decoration: none; font-weight: bold;">Abmelden 🚪</a>
             </div>
             
@@ -85,16 +77,16 @@ def index():
             }}).addTo(map);
 
             let markerMap = {{}};
+            let linienMap = {{}}; // Speichert die gezeichneten Routen-Linien
 
-            // Aktualisiert die Karte und die Liste
             function updateUI(daten) {{
                 geraete = daten;
                 
-                // 1. MARKER AUF KARTE AKTUALISIEREN
                 for (const name in daten) {{
                     const info = daten[name];
                     const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>🚀 Tempo: " + info.speed + " km/h<br>🌐 Netz: " + info.netzwerk;
                     
+                    // 1. MARKER AKTUALISIEREN
                     if (markerMap[name]) {{
                         markerMap[name].setLatLng([info.lat, info.lon]);
                         markerMap[name].getPopup().setContent(popupText);
@@ -104,16 +96,31 @@ def index():
                                          .bindPopup(popupText);
                         markerMap[name] = marker;
                     }}
+
+                    // 2. ROUTE ZEICHNEN (Verbindet alle Punkte aus der Historie)
+                    if (info.historie && info.historie.length > 1) {{
+                        // Altes Linien-Objekt entfernen, falls vorhanden
+                        if (linienMap[name]) {{
+                            map.removeLayer(linienMap[name]);
+                        }}
+                        // Neue Linie zeichnen
+                        const linie = L.polyline(info.historie, {{color: '#007bff', weight: 4, opacity: 0.7}}).addTo(map);
+                        linienMap[name] = linie;
+                    }}
                 }}
                 
+                // Entfernte Geräte von der Karte löschen
                 for (const name in markerMap) {{
                     if (!daten[name]) {{
                         map.removeLayer(markerMap[name]);
                         delete markerMap[name];
+                        if (linienMap[name]) {{
+                            map.removeLayer(linienMap[name]);
+                            delete linienMap[name];
+                        }}
                     }}
                 }}
 
-                // 2. GERÄTELISTE NEU ZEICHNEN
                 const container = document.getElementById('geraete-liste-container');
                 const gerateKeys = Object.keys(daten);
                 
@@ -138,7 +145,6 @@ def index():
                         handyZeitText = "vor " + min + " Min. " + sek + " Sek.";
                     }}
                     
-                    // Akku-Farbe bestimmen
                     let akkuFarbe = "#28a745"; 
                     if (info.akku <= 20) akkuFarbe = "#dc3545";
                     else if (info.akku <= 50) akkuFarbe = "#ffc107";
@@ -165,7 +171,6 @@ def index():
 
             updateUI(geraete);
 
-            // --- GEDÄCHTNIS-LOGIK FÜR DIE TIMER ---
             const JETZT_ZEIT = Math.floor(Date.now() / 1000);
             let letzterErfolgreicherAbruf = localStorage.getItem('letzterAbrufZeitstempel');
             
@@ -211,12 +216,9 @@ def index():
                         return response.json();
                     }})
                     .then(neueDaten => {{
-                        console.log("Hintergrund-Update durchgeführt:", neueDaten);
                         updateUI(neueDaten);
-                        
                         const neuerZeitstempel = Math.floor(Date.now() / 1000);
                         localStorage.setItem('letzterAbrufZeitstempel', neuerZeitstempel);
-                        
                         sekundenSeitUpdate = 0;
                         sekundenBisUpdate = 300; 
                         document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
@@ -229,7 +231,6 @@ def index():
         </script>
         """
 
-    # Das gesamte Layout der Webseite (wird an jeden geschickt)
     return f"""
     <html>
         <head>
@@ -260,14 +261,12 @@ def index():
     </html>
     """
 
-# EXTRA ROUTE FÜR DAS JAVASCRIPT-UPDATE
 @app.route('/api/data', methods=['GET'])
 def get_live_data():
     if not session.get('eingeloggt', False):
         return jsonify({}), 401
     return jsonify(geraete_daten)
 
-# 2. ROUTE FÜR DIE PASSWORT-VERARBEITUNG
 @app.route('/login', methods=['POST'])
 def login():
     eingegebenes_passwort = request.form.get('passwort')
@@ -275,18 +274,15 @@ def login():
         session['eingeloggt'] = True
     return redirect(url_for('index'))
 
-# 3. ROUTE ZUM ABMELDEN
 @app.route('/logout')
 def logout():
     session.pop('eingeloggt', None)
     return redirect(url_for('index'))
 
-# 4. ROUTE FÜR DEN APK-DOWNLOAD (Öffentlich)
 @app.route('/download', methods=['GET'])
 def download_apk():
     return send_from_directory(directory='static', path='app.apk', as_attachment=True)
 
-# 5. ROUTE FÜR DIE ANDROID-APP (Empfängt alle neuen Systemdaten)
 @app.route('/upload', methods=['POST'])
 def upload():
     global geraete_daten
@@ -302,19 +298,32 @@ def upload():
     speed = data.get("speed", 0)
     
     if lat is not None and lon is not None:
+        # Falls das Gerät neu ist, leere Historie anlegen
+        if geraete_name not in geraete_daten:
+            historie = []
+        else:
+            historie = geraete_daten[geraete_name].get("historie", [])
+
+        # Neuen Punkt zur Historie hinzufügen
+        historie.append([lat, lon])
+
+        # Maximal die letzten 10 Punkte behalten, um den Speicher zu schonen
+        if len(historie) > 10:
+            historie.pop(0)
+
         geraete_daten[geraete_name] = {
             "lat": lat, 
             "lon": lon, 
             "akku": akku,
             "netzwerk": netzwerk,
             "speed": speed,
+            "historie": historie,
             "zeitstempel": int(time.time())
         }
         return jsonify({"status": "success"}), 200
     
     return jsonify({"error": "Ungültige Koordinaten"}), 400
 
-# ROUTE ZUM LÖSCHEN EINES GERÄTS
 @app.route('/delete/<name>', methods=['GET', 'POST'])
 def delete_device(name):
     global geraete_daten
