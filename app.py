@@ -10,7 +10,7 @@ CORS(app)
 app.secret_key = os.environ.get("SECRET_KEY", "ein_zufaelliger_geheimer_schluessel_123")
 
 # LEGE HIER DEIN PASSWORT FEST:
-GEHEIMES_PASSWORT = "MeinSicheresPasswort123"
+GEHEIMES_PASSWORT = "192837465"
 
 # Speichert die Live-Daten der Geräte
 geraete_daten = {}
@@ -72,13 +72,54 @@ def index():
                 attribution: '&copy; OpenStreetMap'
             }}).addTo(map);
 
-            for (const name in geraete) {{
-                const info = geraete[name];
-                L.marker([info.lat, info.lon])
-                 .addTo(map)
-                 .bindPopup("<b>" + name + "</b><br>Lat: " + info.lat + "<br>Lon: " + info.lon)
-                 .openPopup();
+            // Speicher für die Marker, damit wir sie später aktualisieren können
+            let markerMap = {{}};
+
+            // Funktion zum Zeichnen/Aktualisieren der Marker
+            function updateMarkers(daten) {{
+                for (const name in daten) {{
+                    const info = daten[name];
+                    
+                    if (markerMap[name]) {{
+                        // Marker existiert schon -> Position updaten
+                        markerMap[name].setLatLng([info.lat, info.lon]);
+                        markerMap[name].getPopup().setContent("<b>" + name + "</b><br>Lat: " + info.lat + "<br>Lon: " + info.lon);
+                    }} else {{
+                        // Neuer Marker -> Erstellen
+                        const marker = L.marker([info.lat, info.lon])
+                                         .addTo(map)
+                                         .bindPopup("<b>" + name + "</b><br>Lat: " + info.lat + "<br>Lon: " + info.lon);
+                        markerMap[name] = marker;
+                    }}
+                }}
+                
+                // Optionale Bereinigung: Wenn ein Gerät gelöscht wurde, Marker von Karte entfernen
+                for (const name in markerMap) {{
+                    if (!daten[name]) {{
+                        map.removeLayer(markerMap[name]);
+                        delete markerMap[name];
+                    }}
+                }}
             }}
+
+            // Erste Marker beim Laden der Seite setzen
+            updateMarkers(geraete);
+
+            // AUTOMATISCHES UPDATE ALLE 5 MINUTEN (Ohne Neuladen der Seite!)
+            setInterval(function() {{
+                fetch('/api/data')
+                    .then(response => {{
+                        if (response.status === 401) {{
+                            window.location.reload(); // Falls Session abgelaufen, zur Loginseite
+                        }}
+                        return response.json();
+                    }})
+                    .then(neueDaten => {{
+                        console.log("Hintergrund-Update durchgeführt:", neueDaten);
+                        updateMarkers(neueDaten);
+                    }})
+                    .catch(err => console.error("Fehler beim Live-Update:", err));
+            }}, 300000); // 300.000 Millisekunden = 5 Minuten
         </script>
         """
 
@@ -87,7 +128,6 @@ def index():
     <html>
         <head>
             <title>App Management Dashboard</title>
-            {"<meta http-equiv='refresh' content='5'>" if ist_eingeloggt else ""}
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <style>
@@ -114,12 +154,18 @@ def index():
     </html>
     """
 
+# EXTRA ROUTE FÜR DAS JAVASCRIPT-UPDATE (Gibt nur die reinen GPS-Daten als JSON aus)
+@app.route('/api/data', methods=['GET'])
+def get_live_data():
+    if not session.get('eingeloggt', False):
+        return jsonify({}), 401
+    return jsonify(geraete_daten)
+
 # 2. ROUTE FÜR DIE PASSWORT-VERARBEITUNG
 @app.route('/login', methods=['POST'])
 def login():
-    
     eingegebenes_passwort = request.form.get('passwort')
-    if eingegebenes_passwort == "192837465":
+    if eingegebenes_passwort == GEHEIMES_PASSWORT:
         session['eingeloggt'] = True  # Setzt das "Erlaubnis-Flag" im Browser
     return redirect(url_for('index'))
 
