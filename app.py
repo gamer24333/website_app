@@ -35,8 +35,7 @@ def index():
     karte_html = ""
     javascript_html = ""
     if ist_eingeloggt:
-        # Falls das Dictionary leer ist, stellen wir sicher, dass valides JSON übergeben wird
-        json_daten = json.dumps(geraete_daten) if geraete_daten else "{}"
+        json_daten = json.dumps(geraete_daten)
         karte_html = """
         <div class="container animate-fade">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -68,40 +67,39 @@ def index():
             let linienMap = {};
             let geraete = %ERSATZ_FUER_DATEN%;
 
-            function initApp() {
+            function startKarte() {
                 let centerLat = 51.1657;
                 let centerLon = 10.4515;
                 let zoomLevel = 5;
 
                 const keys = Object.keys(geraete);
-                // Absicherung: Nur zentrieren, wenn wirklich Daten vorhanden sind
                 if (keys.length > 0 && geraete[keys[0]]) {
-                    if (geraete[keys[0]].lat && geraete[keys[0]].lon) {
-                        centerLat = geraete[keys[0]].lat;
-                        centerLon = geraete[keys[0]].lon;
-                        zoomLevel = 13;
-                    }
+                    centerLat = geraete[keys[0]].lat || centerLat;
+                    centerLon = geraete[keys[0]].lon || centerLon;
+                    zoomLevel = 13;
                 }
 
-                // Karte initialisieren
+                // Initialisiere Karte erst, wenn das HTML geladen ist
                 map = L.map('map').setView([centerLat, centerLon], zoomLevel);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; OpenStreetMap'
                 }).addTo(map);
 
-                // Erste UI-Aktualisierung
                 updateUI(geraete);
 
-                // Timer-Verwaltung starten
-                if (!localStorage.getItem('letzterAbrufZeitstempel')) {
-                    localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
-                }
+                // Setze Zeitstempel sicher
+                localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
 
+                // Der Timer-Loop
                 setInterval(function() {
                     const JETZT = Math.floor(Date.now() / 1000);
-                    let letzterAbruf = parseInt(localStorage.getItem('letzterAbrufZeitstempel')) || JETZT;
+                    let gespeicherterWert = localStorage.getItem('letzterAbrufZeitstempel');
+                    let letzterAbruf = gespeicherterWert ? parseInt(gespeicherterWert) : JETZT;
                     
+                    // Falls aus irgendeinem Grund NaN entsteht, korrigieren
+                    if (isNaN(letzterAbruf)) { letzterAbruf = JETZT; }
+
                     let sekundenSeitUpdate = JETZT - letzterAbruf;
                     let sekundenBisUpdate = 5 - sekundenSeitUpdate;
 
@@ -112,6 +110,8 @@ def index():
 
                     document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
                     document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
+
+                    updateUI(geraete);
                 }, 1000);
             }
 
@@ -133,6 +133,7 @@ def index():
                                          .addTo(map)
                                          .bindPopup(popupText);
                         markerMap[name] = marker;
+                        map.setView([info.lat, info.lon], 14);
                     }
 
                     if (info.historie && info.historie.length > 1) {
@@ -220,8 +221,8 @@ def index():
                     });
             }
 
-            // Ausführung erst triggern, wenn das HTML vollständig geladen ist
-            document.addEventListener("DOMContentLoaded", initApp);
+            // Wichtig: Wartet, bis der graue Kasten im Browser existiert!
+            window.addEventListener('DOMContentLoaded', startKarte);
         </script>
         """.replace("%ERSATZ_FUER_DATEN%", json_daten)
 
@@ -234,7 +235,7 @@ def index():
             <style>
                 body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; }
                 .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-                #map { height: 500px; width: 100%; border-radius: 8px; background-color: #e5e3df; }
+                #map { height: 500px; width: 100%; border-radius: 8px; background-color: #ddd; }
                 .btn { display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; }
                 .btn:hover { background-color: #218838; }
                 .animate-fade { animation: fadeIn 0.5s ease-in; }
