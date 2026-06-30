@@ -1,16 +1,3 @@
-Das Problem liegt tatsächlich an der Logik im JavaScript-Code deiner Flask-Webseite. Der integrierte Timer zählte zwar herunter, holte die Daten jedoch erst nach 5 Minuten (300 Sekunden) ab. Zudem fehlte ein manueller Aktualisierungs-Button im Vordergrund, und das Intervall lief stur im Hintergrund weiter.
-
-Hier ist dein vollständig korrigierter Flask-Code (app.py).
-
-Folgende Änderungen wurden vorgenommen:
-Automatischer Live-Abruf verkürzt: Die Webseite fragt nun alle 5 Sekunden automatisch den Server nach neuen Koordinaten ab, statt alle 5 Minuten.
-
-Manueller Aktualisierungs-Button: Es wurde ein auffälliger Button hinzugefügt, mit dem du die Daten und die Karte im Vordergrund sofort per Klick aktualisieren kannst.
-
-Flüssiger Karten-Zentrierungs-Fix: Wenn neue Daten reinkommen, springt die Karte nicht mehr ruckartig um, sondern aktualisiert die Marker geschmeidig im Vordergrund.
-
-Der korrigierte Code (app.py)
-Python
 import os
 import json
 import time
@@ -110,7 +97,6 @@ def index():
                                          .addTo(map)
                                          .bindPopup(popupText);
                         markerMap[name] = marker;
-                        // Nur beim ersten Erkennen auf das Gerät zentrieren
                         map.setView([info.lat, info.lon], 14);
                     }}
 
@@ -184,7 +170,6 @@ def index():
 
             updateUI(geraete);
 
-            // Lokalen Timer auf 5 Sekunden setzen für schnelles Feedback
             if (!localStorage.getItem('letzterAbrufZeitstempel')) {{
                 localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
             }}
@@ -194,7 +179,7 @@ def index():
                 let letzterAbruf = parseInt(localStorage.getItem('letzterAbrufZeitstempel'));
                 
                 let sekundenSeitUpdate = JETZT - letzterAbruf;
-                let sekundenBisUpdate = 5 - sekundenSeitUpdate; // Intervall auf 5 Sekunden reduziert
+                let sekundenBisUpdate = 5 - sekundenSeitUpdate;
 
                 if (sekundenBisUpdate <= 0) {{
                     datenVomServerHolen();
