@@ -198,7 +198,7 @@ def index():
                 if (sekundenBisUpdate <= 0) {{
                     datenVomServerHolen();
                 }}
-            }, 1000);
+            }}, 1000);
 
             function datenVomServerHolen() {{
                 fetch('/api/data')
