@@ -35,7 +35,6 @@ def index():
     karte_html = ""
     javascript_html = ""
     if ist_eingeloggt:
-        # Bereinige Daten vor der JSON-Ausgabe zur absoluten Sicherheit
         sichere_daten = {}
         jetzt_ts = int(time.time())
         for k, v in geraete_daten.items():
@@ -176,6 +175,7 @@ def index():
                     if (parseInt(info.akku) <= 20) akkuFarbe = "#dc3545";
                     else if (parseInt(info.akku) <= 50) akkuFarbe = "#ffc107";
                     
+                    // FIXED: onclick nutzt jetzt confirm() absolut ohne verschachtelte Text-Anführungszeichen
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
                             '<div>' +
                             '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
@@ -184,7 +184,7 @@ def index():
                             '<span style="margin-left: 15px; color: #6f42c1; font-weight: bold;">🌐 ' + info.netzwerk + '</span>' +
                             '<span style="color: #6c757d; margin-left: 15px;">📡 Letzter Funkspruch: <b>' + handyZeitText + '</b></span>' +
                             '</div>' +
-                            '<a href="/delete/' + encodeURIComponent(name) + '" style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" onclick="return confirm(\'Löschen?\');">Löschen 🗑️</a>' +
+                            '<a href="/delete/' + encodeURIComponent(name) + '" style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" onclick="return confirm(this.title);" title="Gerät wirklich löschen?">Löschen 🗑️</a>' +
                             '</li>';
                 }
                 html += '</ul>';
@@ -242,7 +242,6 @@ def get_live_data():
     if not session.get('eingeloggt', False):
         return jsonify({}), 401
     
-    # Auch hier: Daten vor der API-Ausgabe absolut absichern
     sichere_daten = {}
     jetzt_ts = int(time.time())
     for k, v in geraete_daten.items():
@@ -300,7 +299,6 @@ def upload():
     if len(historie) > 10:
         historie.pop(0)
 
-    # Daten werden hier bombenfest validiert abgespeichert
     geraete_daten[geraete_name] = {
         "lat": lat, 
         "lon": lon, 
