@@ -132,7 +132,7 @@ def logout():
 # 4. ROUTE FÜR DEN APK-DOWNLOAD (Öffentlich)
 @app.route('/download', methods=['GET'])
 def download_apk():
-    return send_from_directory(directory='static', path='app.apk', as_attachment=True)
+    return send_from_directory(directory='static', path='app-debug.apk', as_attachment=True)
 
 # 5. ROUTE FÜR DIE ANDROID-APP (Empfängt die Live-Daten im Hintergrund)
 @app.route('/upload', methods=['POST'])
