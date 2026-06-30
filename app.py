@@ -59,96 +59,97 @@ def index():
             <div id="map"></div>
         </div>
         """
-        javascript_html = f"""
+        
+        # HIER: Kein f vor den Anführungszeichen! Python ignoriert alle geschwungenen Klammern.
+        javascript_html = """
         <script>
-            let geraete = {json_daten};
+            let geraete = %ERSATZ_FUER_DATEN%;
             let centerLat = 51.1657;
             let centerLon = 10.4515;
             let zoomLevel = 5;
 
             const keys = Object.keys(geraete);
-            if (keys.length > 0) {{
+            if (keys.length > 0) {
                 centerLat = geraete[keys[0]].lat;
                 centerLon = geraete[keys[0]].lon;
                 zoomLevel = 13;
-            }}
+            }
 
             const map = L.map('map').setView([centerLat, centerLon], zoomLevel);
 
-            L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap'
-            }}).addTo(map);
+            }).addTo(map);
 
-            let markerMap = {{}};
-            let linienMap = {{}};
+            let markerMap = {};
+            let linienMap = {};
 
-            function updateUI(daten) {{
+            function updateUI(daten) {
                 geraete = daten;
                 
-                for (const name in daten) {{
+                for (const name in daten) {
                     const info = daten[name];
                     const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>🚀 Tempo: " + info.speed + " km/h<br>🌐 Netz: " + info.netzwerk;
                     
-                    if (markerMap[name]) {{
+                    if (markerMap[name]) {
                         markerMap[name].setLatLng([info.lat, info.lon]);
                         markerMap[name].getPopup().setContent(popupText);
-                    }} else {{
+                    } else {
                         const marker = L.marker([info.lat, info.lon])
                                          .addTo(map)
                                          .bindPopup(popupText);
                         markerMap[name] = marker;
                         map.setView([info.lat, info.lon], 14);
-                    }}
+                    }
 
-                    if (info.historie && info.historie.length > 1) {{
-                        if (linienMap[name]) {{
+                    if (info.historie && info.historie.length > 1) {
+                        if (linienMap[name]) {
                             map.removeLayer(linienMap[name]);
-                        }}
-                        const linie = L.polyline(info.historie, {{color: '#007bff', weight: 4, opacity: 0.7}}).addTo(map);
+                        }
+                        const linie = L.polyline(info.historie, {color: '#007bff', weight: 4, opacity: 0.7}).addTo(map);
                         linienMap[name] = linie;
-                    }}
-                }}
+                    }
+                }
                 
-                for (const name in markerMap) {{
-                    if (!daten[name]) {{
+                for (const name in markerMap) {
+                    if (!daten[name]) {
                         map.removeLayer(markerMap[name]);
                         delete markerMap[name];
-                        if (linienMap[name]) {{
+                        if (linienMap[name]) {
                             map.removeLayer(linienMap[name]);
                             delete linienMap[name];
-                        }}
-                    }}
-                }}
+                        }
+                    }
+                }
 
                 const container = document.getElementById('geraete-liste-container');
                 const gerateKeys = Object.keys(daten);
                 
-                if (gerateKeys.length === 0) {{
+                if (gerateKeys.length === 0) {
                     container.innerHTML = "<i>Keine Geräte aktiv</i>";
                     return;
-                }}
+                }
                 
                 let html = '<ul style="list-style: none; padding: 0; margin: 0;">';
                 const jetzt = Math.floor(Date.now() / 1000);
                 
-                for (const name in daten) {{
+                for (const name in daten) {
                     const info = daten[name];
                     const diffSekunden = jetzt - info.zeitstempel;
                     
                     let handyZeitText = "";
-                    if (diffSekunden < 60) {{
+                    if (diffSekunden < 60) {
                         handyZeitText = "vor " + diffSekunden + " Sek.";
-                    }} else {{
+                    } else {
                         let min = Math.floor(diffSekunden / 60);
                         let sek = diffSekunden % 60;
                         handyZeitText = "vor " + min + " Min. " + sek + " Sek.";
-                    }}
+                    }
                     
                     let akkuFarbe = "#28a745"; 
                     if (info.akku <= 20) akkuFarbe = "#dc3545";
                     else if (info.akku <= 50) akkuFarbe = "#ffc107";
                     
-                    // Umgeschrieben auf klassische String-Verknüpfung, um geschwungene Klammern im HTML zu vermeiden
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
                             '<div>' +
                             '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
@@ -166,52 +167,52 @@ def index():
                 }
                 html += '</ul>';
                 container.innerHTML = html;
-            }}
+            }
 
             updateUI(geraete);
 
-            if (!localStorage.getItem('letzterAbrufZeitstempel')) {{
+            if (!localStorage.getItem('letzterAbrufZeitstempel')) {
                 localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
-            }}
+            }
 
-            setInterval(function() {{
+            setInterval(function() {
                 const JETZT = Math.floor(Date.now() / 1000);
                 let letzterAbruf = parseInt(localStorage.getItem('letzterAbrufZeitstempel'));
                 
                 let sekundenSeitUpdate = JETZT - letzterAbruf;
                 let sekundenBisUpdate = 5 - sekundenSeitUpdate;
 
-                if (sekundenBisUpdate <= 0) {{
+                if (sekundenBisUpdate <= 0) {
                     datenVomServerHolen();
                     return;
-                }}
+                }
 
                 let seitText = sekundenSeitUpdate + " Sek.";
                 document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + seitText;
                 document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
 
                 updateUI(geraete);
-            }}, 1000);
+            }, 1000);
 
-            function datenVomServerHolen() {{
+            function datenVomServerHolen() {
                 fetch('/api/data')
-                    .then(response => {{
-                        if (response.status === 401) {{
+                    .then(response => {
+                        if (response.status === 401) {
                             window.location.reload();
-                        }}
+                        }
                         return response.json();
-                    }})
-                    .then(neueDaten => {{
+                    })
+                    .then(neueDaten => {
                         updateUI(neueDaten);
                         localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
                         document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
-                    }})
-                    .catch(err => {{
+                    })
+                    .catch(err => {
                         console.error("Fehler beim Live-Update:", err);
-                    }});
-            }}
+                    });
+            }
         </script>
-        """
+        """.replace("%ERSATZ_FUER_DATEN%", json_daten) # Hier wird die Variable sicher eingefügt
 
     return f"""
     <html>
