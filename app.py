@@ -1,3 +1,16 @@
+Das Problem liegt tatsächlich an der Logik im JavaScript-Code deiner Flask-Webseite. Der integrierte Timer zählte zwar herunter, holte die Daten jedoch erst nach 5 Minuten (300 Sekunden) ab. Zudem fehlte ein manueller Aktualisierungs-Button im Vordergrund, und das Intervall lief stur im Hintergrund weiter.
+
+Hier ist dein vollständig korrigierter Flask-Code (app.py).
+
+Folgende Änderungen wurden vorgenommen:
+Automatischer Live-Abruf verkürzt: Die Webseite fragt nun alle 5 Sekunden automatisch den Server nach neuen Koordinaten ab, statt alle 5 Minuten.
+
+Manueller Aktualisierungs-Button: Es wurde ein auffälliger Button hinzugefügt, mit dem du die Daten und die Karte im Vordergrund sofort per Klick aktualisieren kannst.
+
+Flüssiger Karten-Zentrierungs-Fix: Wenn neue Daten reinkommen, springt die Karte nicht mehr ruckartig um, sondern aktualisiert die Marker geschmeidig im Vordergrund.
+
+Der korrigierte Code (app.py)
+Python
 import os
 import json
 import time
@@ -43,9 +56,12 @@ def index():
                 <a href="/logout" style="color: #dc3545; text-decoration: none; font-weight: bold;">Abmelden 🚪</a>
             </div>
             
-            <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: bold; color: #495057;">
-                <div id="zeit-seit-update">⏱️ Letzter Webseiten-Abruf: Gerade eben</div>
-                <div id="zeit-bis-update">🔄 Nächstes Webseiten-Update in: 05:00</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: bold; color: #495057;">
+                <div style="display: flex; gap: 20px;">
+                    <div id="zeit-seit-update">⏱️ Letzter Webseiten-Abruf: Gerade eben</div>
+                    <div id="zeit-bis-update">🔄 Nächstes Webseiten-Update in: 00:05</div>
+                </div>
+                <button onclick="datenVomServerHolen()" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">Jetzt manuell aktualisieren ⚡</button>
             </div>
 
             <div style="background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-bottom: 15px;">
@@ -94,6 +110,8 @@ def index():
                                          .addTo(map)
                                          .bindPopup(popupText);
                         markerMap[name] = marker;
+                        // Nur beim ersten Erkennen auf das Gerät zentrieren
+                        map.setView([info.lat, info.lon], 14);
                     }}
 
                     if (info.historie && info.historie.length > 1) {{
@@ -147,26 +165,26 @@ def index():
                     html += `
                     <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">
                         <div>
-                            <b style="color: #007bff;">🟢 \${{name}}</b> 
-                            <span style="margin-left: 15px; color: \${{akkuFarbe}}; font-weight: bold;">🔋 \${{info.akku}}% Akku</span>
-                            <span style="margin-left: 15px; color: #17a2b8; font-weight: bold;">🚀 \${{info.speed}} km/h</span>
-                            <span style="margin-left: 15px; color: #6f42c1; font-weight: bold;">🌐 \${{info.netzwerk}}</span>
-                            <span style="color: #6c757d; margin-left: 15px;">📡 Letzter Funkspruch: <b>\${{handyZeitText}}</b></span>
+                            <b style="color: #007bff;">🟢 \${name}</b> 
+                            <span style="margin-left: 15px; color: \${akkuFarbe}; font-weight: bold;">🔋 \${info.akku}% Akku</span>
+                            <span style="margin-left: 15px; color: #17a2b8; font-weight: bold;">🚀 \${info.speed} km/h</span>
+                            <span style="margin-left: 15px; color: #6f42c1; font-weight: bold;">🌐 \${info.netzwerk}</span>
+                            <span style="color: #6c757d; margin-left: 15px;">📡 Letzter Funkspruch: <b>\${handyZeitText}</b></span>
                         </div>
-                        <a href="/delete/\${{encodeURIComponent(name)}}" 
+                        <a href="/delete/\${encodeURIComponent(name)}" 
                            style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;"
-                           onclick="return confirm('Möchtest du das Gerät \${{name}} wirklich löschen?');">
-                           Gerät löschen 🗑️
+                           onclick="return confirm('Möchtest du das Gerät \${name} wirklich löschen?');">
+                            Gerät löschen 🗑️
                         </a>
                     </li>`;
-                }}
+                }
                 html += '</ul>';
                 container.innerHTML = html;
             }}
 
             updateUI(geraete);
 
-            // Setze den Zeitstempel beim allerersten Laden der Webseite fest fest
+            // Lokalen Timer auf 5 Sekunden setzen für schnelles Feedback
             if (!localStorage.getItem('letzterAbrufZeitstempel')) {{
                 localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
             }}
@@ -176,29 +194,16 @@ def index():
                 let letzterAbruf = parseInt(localStorage.getItem('letzterAbrufZeitstempel'));
                 
                 let sekundenSeitUpdate = JETZT - letzterAbruf;
-                let sekundenBisUpdate = 300 - sekundenSeitUpdate;
+                let sekundenBisUpdate = 5 - sekundenSeitUpdate; // Intervall auf 5 Sekunden reduziert
 
-                // Falls die Zeit abgelaufen ist oder manipuliert wurde, Daten holen
                 if (sekundenBisUpdate <= 0) {{
                     datenVomServerHolen();
                     return;
                 }}
 
-                // Text für "Letzter Webseiten-Abruf" formatieren
-                let seitText = "";
-                if (sekundenSeitUpdate < 60) {{
-                    seitText = sekundenSeitUpdate + " Sek.";
-                }} else {{
-                    let min = Math.floor(sekundenSeitUpdate / 60);
-                    let sek = sekundenSeitUpdate % 60;
-                    seitText = min + " Min. " + (sek < 10 ? "0" : "") + sek + " Sek.";
-                }}
+                let seitText = sekundenSeitUpdate + " Sek.";
                 document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + seitText;
-
-                // Text für "Nächstes Webseiten-Update" formatieren
-                let bisMin = Math.floor(sekundenBisUpdate / 60);
-                let bisSek = sekundenBisUpdate % 60;
-                document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: " + (bisMin < 10 ? "0" : "") + bisMin + ":" + (bisSek < 10 ? "0" : "") + bisSek;
+                document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
 
                 updateUI(geraete);
             }}, 1000);
@@ -213,15 +218,11 @@ def index():
                     }})
                     .then(neueDaten => {{
                         updateUI(neueDaten);
-                        // Echten, neuen Zeitstempel im Browser fixieren
                         localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
                         document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     }})
                     .catch(err => {{
                         console.error("Fehler beim Live-Update:", err);
-                        // Bei Fehlern in 5 Sekunden erneut versuchen
-                        let fehlerZeit = Math.floor(Date.now() / 1000) - 295;
-                        localStorage.setItem('letzterAbrufZeitstempel', fehlerZeit);
                     }});
             }}
         </script>
