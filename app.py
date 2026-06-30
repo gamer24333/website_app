@@ -117,8 +117,9 @@ def index():
 # 2. ROUTE FÜR DIE PASSWORT-VERARBEITUNG
 @app.route('/login', methods=['POST'])
 def login():
-    eingegebenes_passwort = int(request.form.get('passwort'))
-    if eingegebenes_passwort == 192837465:
+    
+    eingegebenes_passwort = request.form.get('passwort')
+    if eingegebenes_passwort == "192837465":
         session['eingeloggt'] = True  # Setzt das "Erlaubnis-Flag" im Browser
     return redirect(url_for('index'))
 
