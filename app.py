@@ -60,7 +60,6 @@ def index():
         </div>
         """
         
-        # HIER: Kein f vor den Anführungszeichen! Python ignoriert alle geschwungenen Klammern.
         javascript_html = """
         <script>
             let geraete = %ERSATZ_FUER_DATEN%;
@@ -212,22 +211,24 @@ def index():
                     });
             }
         </script>
-        """.replace("%ERSATZ_FUER_DATEN%", json_daten) # Hier wird die Variable sicher eingefügt
+        """.replace("%ERSATZ_FUER_DATEN%", json_daten)
 
-    return f"""
+    # Das gesamte Basis-HTML komplett ohne f"" am Anfang. 
+    # Wir benutzen reines .replace(), damit sich geschwungene CSS-Klammern und Python niemals stören!
+    basis_html = """
     <html>
         <head>
             <title>App Management Dashboard</title>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <style>
-                body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; }}
-                .container {{ background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }}
-                #map {{ height: 500px; width: 100%; border-radius: 8px; }}
-                .btn {{ display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; }}
-                .btn:hover {{ background-color: #218838; }}
-                .animate-fade {{ animation: fadeIn 0.5s ease-in; }}
-                @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+                body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; }
+                .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+                #map { height: 500px; width: 100%; border-radius: 8px; }
+                .btn { display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+                .btn:hover { background-color: #218838; }
+                .animate-fade { animation: fadeIn 0.5s ease-in; }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             </style>
         </head>
         <body>
@@ -237,12 +238,19 @@ def index():
                 <a href="/download" class="btn">📥 APK Herunterladen</a>
             </div>
 
-            {login_html}
-            {karte_html}
-            {javascript_html}
+            %LOGIN_BEREICH%
+            %KARTE_BEREICH%
+            %JAVASCRIPT_BEREICH%
         </body>
     </html>
     """
+    
+    # Sicherer Text-Ersatz statt fehleranfälliger F-Strings
+    ausgabe_html = basis_html.replace("%LOGIN_BEREICH%", login_html)
+    ausgabe_html = ausgabe_html.replace("%KARTE_BEREICH%", karte_html)
+    ausgabe_html = ausgabe_html.replace("%JAVASCRIPT_BEREICH%", javascript_html)
+    
+    return ausgabe_html
 
 @app.route('/api/data', methods=['GET'])
 def get_live_data():
