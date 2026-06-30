@@ -152,6 +152,22 @@ def upload():
     
     return jsonify({"error": "Ungültige Koordinaten"}), 400
 
+
+# ROUTE ZUM LÖSCHEN EINES GERÄTS
+@app.route('/delete/<name>', methods=['POST', 'GET'])
+def delete_device(name):
+    global geraete_daten
+    # Prüfen, ob der Nutzer eingeloggt ist (Sicherheitsfunktion)
+    if not session.get('eingeloggt', False):
+        return redirect(url_for('index'))
+        
+    # Gerät aus dem Dictionary entfernen, falls es existiert
+    if name in geraete_daten:
+        del geraete_daten[name]
+        print(f"Gerät {name} wurde gelöscht.", flush=True)
+        
+    return redirect(url_for('index'))
+    
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
