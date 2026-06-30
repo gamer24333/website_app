@@ -77,7 +77,7 @@ def index():
             }}).addTo(map);
 
             let markerMap = {{}};
-            let linienMap = {{}}; // Speichert die gezeichneten Routen-Linien
+            let linienMap = {{}};
 
             function updateUI(daten) {{
                 geraete = daten;
@@ -86,7 +86,6 @@ def index():
                     const info = daten[name];
                     const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>🚀 Tempo: " + info.speed + " km/h<br>🌐 Netz: " + info.netzwerk;
                     
-                    // 1. MARKER AKTUALISIEREN
                     if (markerMap[name]) {{
                         markerMap[name].setLatLng([info.lat, info.lon]);
                         markerMap[name].getPopup().setContent(popupText);
@@ -97,19 +96,15 @@ def index():
                         markerMap[name] = marker;
                     }}
 
-                    // 2. ROUTE ZEICHNEN (Verbindet alle Punkte aus der Historie)
                     if (info.historie && info.historie.length > 1) {{
-                        // Altes Linien-Objekt entfernen, falls vorhanden
                         if (linienMap[name]) {{
                             map.removeLayer(linienMap[name]);
                         }}
-                        // Neue Linie zeichnen
                         const linie = L.polyline(info.historie, {{color: '#007bff', weight: 4, opacity: 0.7}}).addTo(map);
                         linienMap[name] = linie;
                     }}
                 }}
                 
-                // Entfernte Geräte von der Karte löschen
                 for (const name in markerMap) {{
                     if (!daten[name]) {{
                         map.removeLayer(markerMap[name]);
@@ -171,21 +166,25 @@ def index():
 
             updateUI(geraete);
 
-            const JETZT_ZEIT = Math.floor(Date.now() / 1000);
-            let letzterErfolgreicherAbruf = localStorage.getItem('letzterAbrufZeitstempel');
-            
-            if (!letzterErfolgreicherAbruf) {{
-                letzterErfolgreicherAbruf = JETZT_ZEIT;
-                localStorage.setItem('letzterAbrufZeitstempel', letzterErfolgreicherAbruf);
+            // Setze den Zeitstempel beim allerersten Laden der Webseite fest fest
+            if (!localStorage.getItem('letzterAbrufZeitstempel')) {{
+                localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
             }}
 
-            let sekundenSeitUpdate = JETZT_ZEIT - parseInt(letzterErfolgreicherAbruf);
-            let sekundenBisUpdate = 300 - (sekundenSeitUpdate % 300);
-
             setInterval(function() {{
-                sekundenSeitUpdate++;
-                sekundenBisUpdate--;
+                const JETZT = Math.floor(Date.now() / 1000);
+                let letzterAbruf = parseInt(localStorage.getItem('letzterAbrufZeitstempel'));
+                
+                let sekundenSeitUpdate = JETZT - letzterAbruf;
+                let sekundenBisUpdate = 300 - sekundenSeitUpdate;
 
+                // Falls die Zeit abgelaufen ist oder manipuliert wurde, Daten holen
+                if (sekundenBisUpdate <= 0) {{
+                    datenVomServerHolen();
+                    return;
+                }}
+
+                // Text für "Letzter Webseiten-Abruf" formatieren
                 let seitText = "";
                 if (sekundenSeitUpdate < 60) {{
                     seitText = sekundenSeitUpdate + " Sek.";
@@ -196,15 +195,12 @@ def index():
                 }}
                 document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + seitText;
 
+                // Text für "Nächstes Webseiten-Update" formatieren
                 let bisMin = Math.floor(sekundenBisUpdate / 60);
                 let bisSek = sekundenBisUpdate % 60;
                 document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: " + (bisMin < 10 ? "0" : "") + bisMin + ":" + (bisSek < 10 ? "0" : "") + bisSek;
 
                 updateUI(geraete);
-
-                if (sekundenBisUpdate <= 0) {{
-                    datenVomServerHolen();
-                }}
             }}, 1000);
 
             function datenVomServerHolen() {{
@@ -217,15 +213,15 @@ def index():
                     }})
                     .then(neueDaten => {{
                         updateUI(neueDaten);
-                        const neuerZeitstempel = Math.floor(Date.now() / 1000);
-                        localStorage.setItem('letzterAbrufZeitstempel', neuerZeitstempel);
-                        sekundenSeitUpdate = 0;
-                        sekundenBisUpdate = 300; 
+                        // Echten, neuen Zeitstempel im Browser fixieren
+                        localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
                         document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     }})
                     .catch(err => {{
                         console.error("Fehler beim Live-Update:", err);
-                        sekundenBisUpdate = 5; 
+                        // Bei Fehlern in 5 Sekunden erneut versuchen
+                        let fehlerZeit = Math.floor(Date.now() / 1000) - 295;
+                        localStorage.setItem('letzterAbrufZeitstempel', fehlerZeit);
                     }});
             }}
         </script>
@@ -298,16 +294,13 @@ def upload():
     speed = data.get("speed", 0)
     
     if lat is not None and lon is not None:
-        # Falls das Gerät neu ist, leere Historie anlegen
         if geraete_name not in geraete_daten:
             historie = []
         else:
             historie = geraete_daten[geraete_name].get("historie", [])
 
-        # Neuen Punkt zur Historie hinzufügen
         historie.append([lat, lon])
 
-        # Maximal die letzten 10 Punkte behalten, um den Speicher zu schonen
         if len(historie) > 10:
             historie.pop(0)
 
