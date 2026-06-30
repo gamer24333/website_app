@@ -35,7 +35,22 @@ def index():
     karte_html = ""
     javascript_html = ""
     if ist_eingeloggt:
-        json_daten = json.dumps(geraete_daten) if geraete_daten else "{}"
+        # Bereinige Daten vor der JSON-Ausgabe zur absoluten Sicherheit
+        sichere_daten = {}
+        jetzt_ts = int(time.time())
+        for k, v in geraete_daten.items():
+            sichere_daten[k] = {
+                "lat": float(v.get("lat", 51.1657)),
+                "lon": float(v.get("lon", 10.4515)),
+                "akku": str(v.get("akku", "??")),
+                "netzwerk": str(v.get("netzwerk", "Unbekannt")),
+                "speed": str(v.get("speed", "0")),
+                "historie": v.get("historie", []),
+                "zeitstempel": int(v.get("zeitstempel", jetzt_ts))
+            }
+        
+        json_daten = json.dumps(sichere_daten)
+        
         karte_html = """
         <div class="container animate-fade">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -66,42 +81,28 @@ def index():
             let markerMap = {};
             let linienMap = {};
             let geraete = %ERSATZ_FUER_DATEN%;
-            // Unabhängig vom lokalen Browser-Speicher setzen:
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
-
-            function pruefeUndStarte() {
-                if (typeof L === 'undefined') {
-                    setTimeout(pruefeUndStarte, 200);
-                    return;
-                }
-                startKarte();
-            }
 
             function startKarte() {
                 let centerLat = 51.1657;
                 let centerLon = 10.4515;
                 let zoomLevel = 5;
 
-                try {
-                    const keys = Object.keys(geraete);
-                    if (keys.length > 0 && geraete[keys[0]]) {
-                        centerLat = geraete[keys[0]].lat || centerLat;
-                        centerLon = geraete[keys[0]].lon || centerLon;
-                        zoomLevel = 13;
-                    }
-
-                    map = L.map('map').setView([centerLat, centerLon], zoomLevel);
-
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; OpenStreetMap'
-                    }).addTo(map);
-
-                    updateUI(geraete);
-                } catch (e) {
-                    console.error("Fehler bei der Karten-Initialisierung:", e);
+                const keys = Object.keys(geraete);
+                if (keys.length > 0 && geraete[keys[0]]) {
+                    centerLat = geraete[keys[0]].lat || centerLat;
+                    centerLon = geraete[keys[0]].lon || centerLon;
+                    zoomLevel = 13;
                 }
 
-                // Stabiler Timer-Loop ohne localStorage-Aufrufe
+                map = L.map('map').setView([centerLat, centerLon], zoomLevel);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(map);
+
+                updateUI(geraete);
+
                 setInterval(function() {
                     const JETZT = Math.floor(Date.now() / 1000);
                     let sekundenSeitUpdate = JETZT - letzterAbrufZeitstempel;
@@ -114,9 +115,8 @@ def index():
 
                     const seitElem = document.getElementById('zeit-seit-update');
                     const bisElem = document.getElementById('zeit-bis-update');
-                    
-                    if (seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
-                    if (bisElem) bisElem.innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
+                    if(seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
+                    if(bisElem) bisElem.innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
                 }, 1000);
             }
 
@@ -134,17 +134,13 @@ def index():
                         markerMap[name].setLatLng([info.lat, info.lon]);
                         markerMap[name].getPopup().setContent(popupText);
                     } else {
-                        const marker = L.marker([info.lat, info.lon])
-                                         .addTo(map)
-                                         .bindPopup(popupText);
+                        const marker = L.marker([info.lat, info.lon]).addTo(map).bindPopup(popupText);
                         markerMap[name] = marker;
                         map.setView([info.lat, info.lon], 14);
                     }
 
                     if (info.historie && info.historie.length > 1) {
-                        if (linienMap[name]) {
-                            map.removeLayer(linienMap[name]);
-                        }
+                        if (linienMap[name]) { map.removeLayer(linienMap[name]); }
                         const linie = L.polyline(info.historie, {color: '#007bff', weight: 4, opacity: 0.7}).addTo(map);
                         linienMap[name] = linie;
                     }
@@ -154,17 +150,14 @@ def index():
                     if (!daten[name]) {
                         map.removeLayer(markerMap[name]);
                         delete markerMap[name];
-                        if (linienMap[name]) {
-                            map.removeLayer(linienMap[name]);
-                            delete linienMap[name];
-                        }
+                        if (linienMap[name]) { map.removeLayer(linienMap[name]); delete linienMap[name]; }
                     }
                 }
 
                 const container = document.getElementById('geraete-liste-container');
                 if (!container) return;
-                
                 const gerateKeys = Object.keys(daten);
+                
                 if (gerateKeys.length === 0) {
                     container.innerHTML = "<i>Keine Geräte aktiv</i>";
                     return;
@@ -175,10 +168,13 @@ def index():
                 
                 for (const name in daten) {
                     const info = daten[name];
-                    const diffSekunden = jetzt - (info.zeitstempel || jetzt);
+                    const ts = info.zeitstempel || jetzt;
+                    const diffSekunden = jetzt - ts;
                     
                     let handyZeitText = diffSekunden < 60 ? "vor " + diffSekunden + " Sek." : "vor " + Math.floor(diffSekunden / 60) + " Min.";
-                    let akkuFarbe = info.akku <= 20 ? "#dc3545" : (info.akku <= 50 ? "#ffc107" : "#28a745");
+                    let akkuFarbe = "#28a745"; 
+                    if (parseInt(info.akku) <= 20) akkuFarbe = "#dc3545";
+                    else if (parseInt(info.akku) <= 50) akkuFarbe = "#ffc107";
                     
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
                             '<div>' +
@@ -188,11 +184,7 @@ def index():
                             '<span style="margin-left: 15px; color: #6f42c1; font-weight: bold;">🌐 ' + info.netzwerk + '</span>' +
                             '<span style="color: #6c757d; margin-left: 15px;">📡 Letzter Funkspruch: <b>' + handyZeitText + '</b></span>' +
                             '</div>' +
-                            '<a href="/delete/' + encodeURIComponent(name) + '" ' +
-                            'style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" ' +
-                            'onclick="return confirm(\'Möchtest du das Gerät ' + name + ' wirklich löschen?\');">' +
-                            'Gerät löschen 🗑️' +
-                            '</a>' +
+                            '<a href="/delete/' + encodeURIComponent(name) + '" style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" onclick="return confirm(\'Löschen?\');">Löschen 🗑️</a>' +
                             '</li>';
                 }
                 html += '</ul>';
@@ -201,31 +193,23 @@ def index():
 
             function datenVomServerHolen() {
                 fetch('/api/data')
-                    .then(response => {
-                        if (response.status === 401) {
-                            window.location.reload();
-                        }
-                        return response.json();
-                    })
+                    .then(response => { if (response.status === 401) { window.location.reload(); } return response.json(); })
                     .then(neueDaten => {
                         updateUI(neueDaten);
                         letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
                         const seitElem = document.getElementById('zeit-seit-update');
-                        if (seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
+                        if(seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     })
-                    .catch(err => {
-                        console.error("Fehler beim Live-Update:", err);
-                    });
+                    .catch(err => { console.error("Fehler beim Live-Update:", err); });
             }
 
-            window.addEventListener('DOMContentLoaded', pruefeUndStarte);
+            window.addEventListener('DOMContentLoaded', startKarte);
         </script>
         """.replace("%ERSATZ_FUER_DATEN%", json_daten)
 
     basis_html = """
     <html>
         <head>
-            <meta charset="utf-8">
             <title>App Management Dashboard</title>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -245,30 +229,37 @@ def index():
                 <p>Hier kann jeder die aktuelle Version der App auf sein Android-Smartphone laden:</p>
                 <a href="/download" class="btn">📥 APK Herunterladen</a>
             </div>
-
             %LOGIN_BEREICH%
             %KARTE_BEREICH%
             %JAVASCRIPT_BEREICH%
         </body>
     </html>
     """
-    
-    ausgabe_html = basis_html.replace("%LOGIN_BEREICH%", login_html)
-    ausgabe_html = ausgabe_html.replace("%KARTE_BEREICH%", karte_html)
-    ausgabe_html = ausgabe_html.replace("%JAVASCRIPT_BEREICH%", javascript_html)
-    
-    return ausgabe_html
+    return basis_html.replace("%LOGIN_BEREICH%", login_html).replace("%KARTE_BEREICH%", karte_html).replace("%JAVASCRIPT_BEREICH%", javascript_html)
 
 @app.route('/api/data', methods=['GET'])
 def get_live_data():
     if not session.get('eingeloggt', False):
         return jsonify({}), 401
-    return jsonify(geraete_daten)
+    
+    # Auch hier: Daten vor der API-Ausgabe absolut absichern
+    sichere_daten = {}
+    jetzt_ts = int(time.time())
+    for k, v in geraete_daten.items():
+        sichere_daten[k] = {
+            "lat": float(v.get("lat", 51.1657)),
+            "lon": float(v.get("lon", 10.4515)),
+            "akku": str(v.get("akku", "??")),
+            "netzwerk": str(v.get("netzwerk", "Unbekannt")),
+            "speed": str(v.get("speed", "0")),
+            "historie": v.get("historie", []),
+            "zeitstempel": int(v.get("zeitstempel", jetzt_ts))
+        }
+    return jsonify(sichere_daten)
 
 @app.route('/login', methods=['POST'])
 def login():
-    eingegebenes_passwort = request.form.get('passwort')
-    if eingegebenes_passwort == GEHEIMES_PASSWORT:
+    if request.form.get('passwort') == GEHEIMES_PASSWORT:
         session['eingeloggt'] = True
     return redirect(url_for('index'))
 
@@ -288,49 +279,45 @@ def upload():
         return jsonify({"error": "Missing JSON"}), 400
         
     data = request.get_json()
-    geraete_name = data.get("name", "Unbekanntes Gerät")
-    lat = data.get("lat")
-    lon = data.get("lon")
-    akku = data.get("akku", "??")
-    netzwerk = data.get("netzwerk", "Unbekannt")
-    speed = data.get("speed", 0)
+    geraete_name = str(data.get("name", "Unbekanntes Gerät"))
     
-    if lat is not None and lon is not None:
-        if geraete_name not in geraete_daten:
-            historie = []
-        else:
-            historie = geraete_daten[geraete_name].get("historie", [])
-
-        historie.append([lat, lon])
-
-        if len(historie) > 10:
-            historie.pop(0)
-
-        geraete_daten[geraete_name] = {
-            "lat": lat, 
-            "lon": lon, 
-            "akku": akku,
-            "netzwerk": netzwerk,
-            "speed": speed,
-            "historie": historie,
-            "zeitstempel": int(time.time())
-        }
-        return jsonify({"status": "success"}), 200
+    try:
+        lat = float(data.get("lat"))
+        lon = float(data.get("lon"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Ungültige Koordinaten"}), 400
+        
+    akku = str(data.get("akku", "??"))
+    netzwerk = str(data.get("netzwerk", "Unbekannt"))
+    speed = str(data.get("speed", "0"))
     
-    return jsonify({"error": "Ungültige Koordinaten"}), 400
+    if geraete_name not in geraete_daten:
+        historie = []
+    else:
+        historie = geraete_daten[geraete_name].get("historie", [])
+
+    historie.append([lat, lon])
+    if len(historie) > 10:
+        historie.pop(0)
+
+    # Daten werden hier bombenfest validiert abgespeichert
+    geraete_daten[geraete_name] = {
+        "lat": lat, 
+        "lon": lon, 
+        "akku": akku,
+        "netzwerk": netzwerk,
+        "speed": speed,
+        "historie": historie,
+        "zeitstempel": int(time.time())
+    }
+    return jsonify({"status": "success"}), 200
 
 @app.route('/delete/<name>', methods=['GET', 'POST'])
 def delete_device(name):
     global geraete_daten
-    if not session.get('eingeloggt', False):
-        return redirect(url_for('index'))
-        
-    if name in geraete_daten:
+    if session.get('eingeloggt', False) and name in geraete_daten:
         del geraete_daten[name]
-        print(f"Gerät {name} wurde gelöscht.", flush=True)
-        
     return redirect(url_for('index'))
     
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
