@@ -35,7 +35,7 @@ def index():
     karte_html = ""
     javascript_html = ""
     if ist_eingeloggt:
-        json_daten = json.dumps(geraete_daten)
+        json_daten = json.dumps(geraete_daten) if geraete_daten else "{}"
         karte_html = """
         <div class="container animate-fade">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -66,41 +66,48 @@ def index():
             let markerMap = {};
             let linienMap = {};
             let geraete = %ERSATZ_FUER_DATEN%;
+            // Unabhängig vom Browser-Speicher: Wir tracken die Zeit direkt in der Session
+            let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
+
+            function pruefeUndStarte() {
+                // Falls Leaflet noch nicht aus dem Internet geladen wurde, kurz warten
+                if (typeof L === 'undefined') {
+                    console.log("Warte auf Leaflet Bibliothek...");
+                    setTimeout(pruefeUndStarte, 200);
+                    return;
+                }
+                startKarte();
+            }
 
             function startKarte() {
                 let centerLat = 51.1657;
                 let centerLon = 10.4515;
                 let zoomLevel = 5;
 
-                const keys = Object.keys(geraete);
-                if (keys.length > 0 && geraete[keys[0]]) {
-                    centerLat = geraete[keys[0]].lat || centerLat;
-                    centerLon = geraete[keys[0]].lon || centerLon;
-                    zoomLevel = 13;
+                try {
+                    const keys = Object.keys(geraete);
+                    if (keys.length > 0 && geraete[keys[0]]) {
+                        centerLat = geraete[keys[0]].lat || centerLat;
+                        centerLon = geraete[keys[0]].lon || centerLon;
+                        zoomLevel = 13;
+                    }
+
+                    // Karte initialisieren
+                    map = L.map('map').setView([centerLat, centerLon], zoomLevel);
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap'
+                    }).addTo(map);
+
+                    updateUI(geraete);
+                } catch (e) {
+                    console.error("Fehler bei Karteninitialisierung:", e);
                 }
 
-                // Initialisiere Karte erst, wenn das HTML geladen ist
-                map = L.map('map').setView([centerLat, centerLon], zoomLevel);
-
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap'
-                }).addTo(map);
-
-                updateUI(geraete);
-
-                // Setze Zeitstempel sicher
-                localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
-
-                // Der Timer-Loop
+                // Der absolut sichere Loop ohne localStorage-Absturzgefahr
                 setInterval(function() {
                     const JETZT = Math.floor(Date.now() / 1000);
-                    let gespeicherterWert = localStorage.getItem('letzterAbrufZeitstempel');
-                    let letzterAbruf = gespeicherterWert ? parseInt(gespeicherterWert) : JETZT;
-                    
-                    // Falls aus irgendeinem Grund NaN entsteht, korrigieren
-                    if (isNaN(letzterAbruf)) { letzterAbruf = JETZT; }
-
-                    let sekundenSeitUpdate = JETZT - letzterAbruf;
+                    let sekundenSeitUpdate = JETZT - letzterAbrufZeitstempel;
                     let sekundenBisUpdate = 5 - sekundenSeitUpdate;
 
                     if (sekundenBisUpdate <= 0) {
@@ -108,15 +115,16 @@ def index():
                         return;
                     }
 
-                    document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
-                    document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
-
-                    updateUI(geraete);
+                    const seitElem = document.getElementById('zeit-seit-update');
+                    const bisElem = document.getElementById('zeit-bis-update');
+                    
+                    if (seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
+                    if (bisElem) bisElem.innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
                 }, 1000);
             }
 
             function updateUI(daten) {
-                if (!daten) return;
+                if (!daten || !map) return;
                 geraete = daten;
                 
                 for (const name in daten) {
@@ -157,8 +165,9 @@ def index():
                 }
 
                 const container = document.getElementById('geraete-liste-container');
-                const gerateKeys = Object.keys(daten);
+                if (!container) return;
                 
+                const gerateKeys = Object.keys(daten);
                 if (gerateKeys.length === 0) {
                     container.innerHTML = "<i>Keine Geräte aktiv</i>";
                     return;
@@ -169,20 +178,10 @@ def index():
                 
                 for (const name in daten) {
                     const info = daten[name];
-                    const diffSekunden = jetzt - info.zeitstempel;
+                    const diffSekunden = jetzt - (info.zeitstempel || jetzt);
                     
-                    let handyZeitText = "";
-                    if (diffSekunden < 60) {
-                        handyZeitText = "vor " + diffSekunden + " Sek.";
-                    } else {
-                        let min = Math.floor(diffSekunden / 60);
-                        let sek = diffSekunden % 60;
-                        handyZeitText = "vor " + min + " Min. " + sek + " Sek.";
-                    }
-                    
-                    let akkuFarbe = "#28a745"; 
-                    if (info.akku <= 20) akkuFarbe = "#dc3545";
-                    else if (info.akku <= 50) akkuFarbe = "#ffc107";
+                    let handyZeitText = diffSekunden < 60 ? "vor " + diffSekunden + " Sek." : "vor " + Math.floor(diffSekunden / 60) + " Min.";
+                    let akkuFarbe = info.akku <= 20 ? "#dc3545" : (info.akku <= 50 ? "#ffc107" : "#28a745");
                     
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
                             '<div>' +
@@ -206,29 +205,27 @@ def index():
             function datenVomServerHolen() {
                 fetch('/api/data')
                     .then(response => {
-                        if (response.status === 401) {
-                            window.location.reload();
-                        }
+                        if (response.status === 401) { window.location.reload(); }
                         return response.json();
                     })
                     .then(neueDaten => {
                         updateUI(neueDaten);
-                        localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
-                        document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
+                        letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
+                        const seitElem = document.getElementById('zeit-seit-update');
+                        if (seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     })
-                    .catch(err => {
-                        console.error("Fehler beim Live-Update:", err);
-                    });
+                    .catch(err => { console.error("Fehler beim Live-Update:", err); });
             }
 
-            // Wichtig: Wartet, bis der graue Kasten im Browser existiert!
-            window.addEventListener('DOMContentLoaded', startKarte);
+            // Ausführung starten, sobald das HTML bereitsteht
+            window.addEventListener('DOMContentLoaded', pruefeUndStarte);
         </script>
         """.replace("%ERSATZ_FUER_DATEN%", json_daten)
 
     basis_html = """
     <html>
         <head>
+            <meta charset="utf-8">
             <title>App Management Dashboard</title>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
