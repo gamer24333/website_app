@@ -148,21 +148,21 @@ def index():
                     if (info.akku <= 20) akkuFarbe = "#dc3545";
                     else if (info.akku <= 50) akkuFarbe = "#ffc107";
                     
-                    html += `
-                    <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">
-                        <div>
-                            <b style="color: #007bff;">🟢 \${name}</b> 
-                            <span style="margin-left: 15px; color: \${akkuFarbe}; font-weight: bold;">🔋 \${info.akku}% Akku</span>
-                            <span style="margin-left: 15px; color: #17a2b8; font-weight: bold;">🚀 \${info.speed} km/h</span>
-                            <span style="margin-left: 15px; color: #6f42c1; font-weight: bold;">🌐 \${info.netzwerk}</span>
-                            <span style="color: #6c757d; margin-left: 15px;">📡 Letzter Funkspruch: <b>\${handyZeitText}</b></span>
-                        </div>
-                        <a href="/delete/\${encodeURIComponent(name)}" 
-                           style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;"
-                           onclick="return confirm('Möchtest du das Gerät \${name} wirklich löschen?');">
-                            Gerät löschen 🗑️
-                        </a>
-                    </li>`;
+                    // Umgeschrieben auf klassische String-Verknüpfung, um geschwungene Klammern im HTML zu vermeiden
+                    html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
+                            '<div>' +
+                            '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
+                            '<span style="margin-left: 15px; color: ' + akkuFarbe + '; font-weight: bold;">🔋 ' + info.akku + '% Akku</span>' +
+                            '<span style="margin-left: 15px; color: #17a2b8; font-weight: bold;">🚀 ' + info.speed + ' km/h</span>' +
+                            '<span style="margin-left: 15px; color: #6f42c1; font-weight: bold;">🌐 ' + info.netzwerk + '</span>' +
+                            '<span style="color: #6c757d; margin-left: 15px;">📡 Letzter Funkspruch: <b>' + handyZeitText + '</b></span>' +
+                            '</div>' +
+                            '<a href="/delete/' + encodeURIComponent(name) + '" ' +
+                            'style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" ' +
+                            'onclick="return confirm(\'Möchtest du das Gerät ' + name + ' wirklich löschen?\');">' +
+                            'Gerät löschen 🗑️' +
+                            '</a>' +
+                            '</li>';
                 }
                 html += '</ul>';
                 container.innerHTML = html;
