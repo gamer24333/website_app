@@ -35,7 +35,7 @@ def index():
     karte_html = ""
     javascript_html = ""
     if ist_eingeloggt:
-        json_daten = json.dumps(geraete_daten)
+        json_daten = json.dumps(geraete_daten) if geraete_daten else "{}"
         karte_html = """
         <div class="container animate-fade">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -62,26 +62,52 @@ def index():
         
         javascript_html = """
         <script>
+            let map, markerMap = {}, linienMap = {};
             let geraete = %ERSATZ_FUER_DATEN%;
-            let centerLat = 51.1657;
-            let centerLon = 10.4515;
-            let zoomLevel = 5;
 
-            const keys = Object.keys(geraete);
-            if (keys.length > 0) {
-                centerLat = geraete[keys[0]].lat;
-                centerLon = geraete[keys[0]].lon;
-                zoomLevel = 13;
+            function initMap() {
+                let centerLat = 51.1657;
+                let centerLon = 10.4515;
+                let zoomLevel = 5;
+
+                const keys = Object.keys(geraete);
+                if (keys.length > 0) {
+                    centerLat = geraete[keys[0]].lat;
+                    centerLon = geraete[keys[0]].lon;
+                    zoomLevel = 13;
+                }
+
+                map = L.map('map').setView([centerLat, centerLon], zoomLevel);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(map);
+
+                updateUI(geraete);
+
+                if (!localStorage.getItem('letzterAbrufZeitstempel')) {
+                    localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
+                }
+
+                setInterval(function() {
+                    const JETZT = Math.floor(Date.now() / 1000);
+                    let letzterAbruf = parseInt(localStorage.getItem('letzterAbrufZeitstempel'));
+                    
+                    let sekundenSeitUpdate = JETZT - letzterAbruf;
+                    let sekundenBisUpdate = 5 - sekundenSeitUpdate;
+
+                    if (sekundenBisUpdate <= 0) {
+                        datenVomServerHolen();
+                        return;
+                    }
+
+                    let seitText = sekundenSeitUpdate + " Sek.";
+                    document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + seitText;
+                    document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
+
+                    updateUI(geraete);
+                }, 1000);
             }
-
-            const map = L.map('map').setView([centerLat, centerLon], zoomLevel);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap'
-            }).addTo(map);
-
-            let markerMap = {};
-            let linienMap = {};
 
             function updateUI(daten) {
                 geraete = daten;
@@ -168,31 +194,6 @@ def index():
                 container.innerHTML = html;
             }
 
-            updateUI(geraete);
-
-            if (!localStorage.getItem('letzterAbrufZeitstempel')) {
-                localStorage.setItem('letzterAbrufZeitstempel', Math.floor(Date.now() / 1000));
-            }
-
-            setInterval(function() {
-                const JETZT = Math.floor(Date.now() / 1000);
-                let letzterAbruf = parseInt(localStorage.getItem('letzterAbrufZeitstempel'));
-                
-                let sekundenSeitUpdate = JETZT - letzterAbruf;
-                let sekundenBisUpdate = 5 - sekundenSeitUpdate;
-
-                if (sekundenBisUpdate <= 0) {
-                    datenVomServerHolen();
-                    return;
-                }
-
-                let seitText = sekundenSeitUpdate + " Sek.";
-                document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + seitText;
-                document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
-
-                updateUI(geraete);
-            }, 1000);
-
             function datenVomServerHolen() {
                 fetch('/api/data')
                     .then(response => {
@@ -210,11 +211,12 @@ def index():
                         console.error("Fehler beim Live-Update:", err);
                     });
             }
+
+            // Sicherstellen, dass das Skript erst läuft, wenn das HTML existiert
+            window.onload = initMap;
         </script>
         """.replace("%ERSATZ_FUER_DATEN%", json_daten)
 
-    # Das gesamte Basis-HTML komplett ohne f"" am Anfang. 
-    # Wir benutzen reines .replace(), damit sich geschwungene CSS-Klammern und Python niemals stören!
     basis_html = """
     <html>
         <head>
@@ -224,7 +226,7 @@ def index():
             <style>
                 body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; }
                 .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-                #map { height: 500px; width: 100%; border-radius: 8px; }
+                #map { height: 500px; width: 100%; border-radius: 8px; margin-top: 15px; background: #e0e0e0; }
                 .btn { display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; }
                 .btn:hover { background-color: #218838; }
                 .animate-fade { animation: fadeIn 0.5s ease-in; }
@@ -245,7 +247,6 @@ def index():
     </html>
     """
     
-    # Sicherer Text-Ersatz statt fehleranfälliger F-Strings
     ausgabe_html = basis_html.replace("%LOGIN_BEREICH%", login_html)
     ausgabe_html = ausgabe_html.replace("%KARTE_BEREICH%", karte_html)
     ausgabe_html = ausgabe_html.replace("%JAVASCRIPT_BEREICH%", javascript_html)
