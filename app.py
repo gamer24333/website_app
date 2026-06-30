@@ -66,13 +66,11 @@ def index():
             let markerMap = {};
             let linienMap = {};
             let geraete = %ERSATZ_FUER_DATEN%;
-            // Unabhängig vom Browser-Speicher: Wir tracken die Zeit direkt in der Session
+            // Unabhängig vom lokalen Browser-Speicher setzen:
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
 
             function pruefeUndStarte() {
-                // Falls Leaflet noch nicht aus dem Internet geladen wurde, kurz warten
                 if (typeof L === 'undefined') {
-                    console.log("Warte auf Leaflet Bibliothek...");
                     setTimeout(pruefeUndStarte, 200);
                     return;
                 }
@@ -92,7 +90,6 @@ def index():
                         zoomLevel = 13;
                     }
 
-                    // Karte initialisieren
                     map = L.map('map').setView([centerLat, centerLon], zoomLevel);
 
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -101,10 +98,10 @@ def index():
 
                     updateUI(geraete);
                 } catch (e) {
-                    console.error("Fehler bei Karteninitialisierung:", e);
+                    console.error("Fehler bei der Karten-Initialisierung:", e);
                 }
 
-                // Der absolut sichere Loop ohne localStorage-Absturzgefahr
+                // Stabiler Timer-Loop ohne localStorage-Aufrufe
                 setInterval(function() {
                     const JETZT = Math.floor(Date.now() / 1000);
                     let sekundenSeitUpdate = JETZT - letzterAbrufZeitstempel;
@@ -205,7 +202,9 @@ def index():
             function datenVomServerHolen() {
                 fetch('/api/data')
                     .then(response => {
-                        if (response.status === 401) { window.location.reload(); }
+                        if (response.status === 401) {
+                            window.location.reload();
+                        }
                         return response.json();
                     })
                     .then(neueDaten => {
@@ -214,10 +213,11 @@ def index():
                         const seitElem = document.getElementById('zeit-seit-update');
                         if (seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     })
-                    .catch(err => { console.error("Fehler beim Live-Update:", err); });
+                    .catch(err => {
+                        console.error("Fehler beim Live-Update:", err);
+                    });
             }
 
-            // Ausführung starten, sobald das HTML bereitsteht
             window.addEventListener('DOMContentLoaded', pruefeUndStarte);
         </script>
         """.replace("%ERSATZ_FUER_DATEN%", json_daten)
