@@ -30,7 +30,7 @@ def index():
         <div class="container animate-fade">
             <h2>🔒 Interner Bereich (Nur für ausgewählte Personen)</h2>
             <p>Bitte gib das Passwort ein, um die Live-Karte zu sehen:</p>
-            <form action="/login" methods="POST" style="display: flex; gap: 10px; max-width: 400px;">
+            <form action="/login" method="POST" style="display: flex; gap: 10px; max-width: 400px;">
                 <input type="password" name="passwort" placeholder="Passwort eingeben..." required 
                        style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
                 <button type="submit" style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">Anmelden</button>
