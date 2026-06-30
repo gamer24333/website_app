@@ -187,7 +187,7 @@ def index():
                 if (sekundenBisUpdate <= 0) {{
                     datenVomServerHolen();
                 }}
-            }, 1000);
+            }}, 1000); // <-- HIER: doppelte {{ }} wegen Python f-String!
 
             function datenVomServerHolen() {{
                 fetch('/api/data')
@@ -208,7 +208,7 @@ def index():
                         console.error("Fehler beim Live-Update:", err);
                         sekundenBisUpdate = 5; 
                     }});
-            }}
+            }} // <-- HIER AUCH: doppelte 
         </script>
         """
 
