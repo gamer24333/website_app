@@ -58,48 +58,164 @@ def index():
     login_html = ""
     if not ist_eingeloggt:
         login_html = """
-        <div class="container animate-fade">
-            <h2>🔒 Interner Bereich (Nur für ausgewählte Personen)</h2>
-            <p>Bitte gib das Passwort ein, um die Live-Karte zu sehen:</p>
-            <form action="/login" method="POST" style="display: flex; gap: 10px; max-width: 400px;">
-                <input type="password" name="passwort" placeholder="Passwort eingeben..." required 
-                       style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
-                <button type="submit" style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">Anmelden</button>
-            </form>
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">
+            <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center;">
+                <h2 style="margin-bottom: 10px; color: #1e293b; font-size: 24px;">🔒 Security Control</h2>
+                <p style="color: #64748b; margin-bottom: 25px; font-size: 14px;">Bitte gib das Master-Passwort ein</p>
+                <form action="/login" method="POST">
+                    <input type="password" name="passwort" placeholder="Passwort eingeben..." required 
+                           style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 20px; font-size: 16px; box-sizing: border-box; outline: none; transition: border 0.2s;">
+                    <button type="submit" style="width: 100%; background: #2563eb; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px;">Dashboard entsperren</button>
+                </form>
+            </div>
         </div>
         """
+        return login_html
     
-    karte_html = ""
-    javascript_html = ""
-    if ist_eingeloggt:
-        sichere_daten = hole_daten_von_supabase()
-        json_daten = json.dumps(sichere_daten)
-        
-        karte_html = """
-        <div class="container animate-fade">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <h1>🗺️ Live-Standorte & Routen aller Geräte</h1>
-                <a href="/logout" style="color: #dc3545; text-decoration: none; font-weight: bold;">Abmelden 🚪</a>
-            </div>
+    # Wenn eingeloggt, rendern wir das moderne Dashboard UI
+    sichere_daten = hole_daten_von_supabase()
+    json_daten = json.dumps(sichere_daten)
+    
+    dashboard_html = """
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <title>HQ Control Center</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+            * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+            body { background: #f8fafc; color: #1e293b; display: flex; height: 100vh; overflow: hidden; }
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: bold; color: #495057;">
-                <div style="display: flex; gap: 20px;">
-                    <div id="zeit-seit-update">⏱️ Letzter Webseiten-Abruf: Gerade eben</div>
-                    <div id="zeit-bis-update">🔄 Nächstes Webseiten-Update in: 00:05</div>
+            /* Sidebar Navigation */
+            .sidebar { width: 260px; background: #0f172a; color: white; padding: 25px 20px; display: flex; flex-direction: column; justify-content: space-between; }
+            .sidebar-brand { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #38bdf8; display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
+            .nav-item { padding: 12px 15px; border-radius: 8px; color: #94a3b8; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; transition: all 0.2s; }
+            .nav-item:hover, .nav-item.active { background: #1e293b; color: white; }
+            .btn-logout { color: #f1f5f9; background: #ef4444; text-align: center; justify-content: center; margin-top: auto; }
+            .btn-logout:hover { background: #dc2626; }
+
+            /* Hauptinhalt */
+            .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 30px; }
+            .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+            .header-title h1 { font-size: 26px; color: #0f172a; font-weight: 700; }
+            
+            /* Status Banner */
+            .status-banner { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 25px; color: #64748b; }
+            .refresh-btn { background: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: background 0.2s; }
+            .refresh-btn:hover { background: #1d4ed8; }
+
+            /* Grid Layout */
+            .grid-container { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
+            .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 25px; }
+            .card-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
+            
+            /* UI Elemente */
+            #map { height: 450px; width: 100%; border-radius: 10px; background: #e2e8f0; border: 1px solid #cbd5e1; }
+            .download-box { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; }
+            .btn-download { display: inline-block; background: white; color: #0369a1; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: transform 0.2s; }
+            .btn-download:hover { transform: translateY(-1px); }
+
+            /* Tabelle & Listen */
+            .device-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+            .device-table th { background: #f8fafc; color: #64748b; font-weight: 600; padding: 12px; border-bottom: 2px solid #e2e8f0; }
+            .device-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+            
+            /* Badges */
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+            .badge-success { background: #dcfce7; color: #15803d; }
+            .badge-danger { background: #fee2e2; color: #b91c1c; }
+            .badge-info { background: #e0f2fe; color: #0369a1; }
+            .badge-purple { background: #f3e8ff; color: #6b21a8; }
+            .badge-warning { background: #fef9c3; color: #a16207; }
+
+            /* Steuerungs-Formular */
+            .control-panel select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none; margin-bottom: 12px; }
+            .control-panel button { width: 100%; background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+            .control-panel button:hover { background: #059669; }
+        </style>
+    </head>
+    <body>
+
+        <div class="sidebar">
+            <div>
+                <div class="sidebar-brand">📡 SYSTEM CONTROL</div>
+                <a href="#" class="nav-item active">📊 Live Dashboard</a>
+                <a href="/download" class="nav-item">📥 APK Download</a>
+            </div>
+            <a href="/logout" class="nav-item btn-logout">Abmelden ➔</a>
+        </div>
+
+        <div class="main-content">
+            <div class="header-bar">
+                <div class="header-title">
+                    <h1>Echtzeit Überwachungs-Zentrale</h1>
                 </div>
-                <button onclick="datenVomServerHolen()" style="background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">Jetzt manuell aktualisieren ⚡</button>
+                <div class="card download-box" style="margin: 0; padding: 12px 20px; display: flex; align-items: center; gap: 15px;">
+                    <span style="font-size: 14px; font-weight: 600;">System-Client auf Handy installieren:</span>
+                    <a href="/download" class="btn-download">📥 APK Download</a>
+                </div>
             </div>
 
-            <div style="background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-bottom: 15px;">
-                <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 16px; color: #495057;">📱 Aktive Geräte & Status:</h3>
-                <div id="geraete-liste-container"><i>Keine Geräte aktiv</i></div>
+            <div class="status-banner">
+                <div id="zeit-seit-update" style="flex: 1;">⏱️ Letzter Webseiten-Abruf: Gerade eben</div>
+                <div id="zeit-bis-update" style="width: 220px;">🔄 Nächstes Live-Update in: 00:05</div>
+                <button onclick="datenVomServerHolen()" class="refresh-btn">Jetzt aktualisieren ⚡</button>
             </div>
-            
-            <div id="map" style="height: 500px; width: 100%; border-radius: 8px;"></div>
+
+            <div class="grid-container">
+                
+                <div>
+                    <div class="card">
+                        <div class="card-title">🗺️ Global Live-Map Tracking</div>
+                        <div id="map"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card control-panel">
+                        <div class="card-title">🛠️ Live App-Fernsteuerung</div>
+                        <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Wähle ein aktives Gerät und die zu startende App aus:</p>
+                        <select id="deviceSelect" onchange="updateAppDropdown()">
+                            <option value="">-- Gerät auswählen --</option>
+                        </select>
+                        <select id="appSelect" disabled>
+                            <option value="">-- Zuerst Gerät wählen --</option>
+                        </select>
+                        <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl senden</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="card" style="margin-top: 5px;">
+                <div class="card-title">📱 Registrierte Geräte & Ausgelesene Bedienungshilfen-Daten</div>
+                <div style="overflow-x: auto;">
+                    <table class="device-table">
+                        <thead>
+                            <tr>
+                                <th>Status/Name</th>
+                                <th>Akku</th>
+                                <th>Tempo</th>
+                                <th>Netzwerk</th>
+                                <th>Letzter Abfang-Status (App / Block / Push)</th>
+                                <th>Systemhilfe</th>
+                                <th>Funkspruch</th>
+                                <th style="text-align: right;">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody id="device-table-body">
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: #94a3b8; font-style: italic; padding: 30px;">Warte auf Datenübertragung vom Server...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
-        """
-        
-        javascript_html = """
+
         <script>
             let map;
             let markerMap = {};
@@ -116,17 +232,17 @@ def index():
                 if (keys.length > 0 && geraete[keys[0]]) {
                     centerLat = geraete[keys[0]].lat || centerLat;
                     centerLon = geraete[keys[0]].lon || centerLon;
-                    zoomLevel = 13;
+                    zoomLevel = 12;
                 }
 
                 map = L.map('map').setView([centerLat, centerLon], zoomLevel);
-
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; OpenStreetMap'
                 }).addTo(map);
 
                 updateUI(geraete);
 
+                // Automatischer Countdown-Timer (5 Sekunden Takt)
                 setInterval(function() {
                     const JETZT = Math.floor(Date.now() / 1000);
                     let sekundenSeitUpdate = JETZT - letzterAbrufZeitstempel;
@@ -137,10 +253,8 @@ def index():
                         return;
                     }
 
-                    const seitElem = document.getElementById('zeit-seit-update');
-                    const bisElem = document.getElementById('zeit-bis-update');
-                    if(seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
-                    if(bisElem) bisElem.innerHTML = "🔄 Nächstes Webseiten-Update in: 00:00" + sekundenBisUpdate;
+                    document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
+                    document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Live-Update in: 00:0" + sekundenBisUpdate;
                 }, 1000);
             }
 
@@ -148,75 +262,134 @@ def index():
                 if (!daten || !map) return;
                 geraete = daten;
                 
+                // 1. Karten-Marker aktualisieren
                 for (const name in daten) {
                     const info = daten[name];
                     if (!info.lat || !info.lon) continue;
 
-                    const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>🚀 Tempo: " + info.speed + " km/h<br>📱 App: " + info.aktuelle_app;
+                    const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>📱 Status: " + info.aktuelle_app;
                     
                     if (markerMap[name]) {
                         markerMap[name].setLatLng([info.lat, info.lon]);
                         markerMap[name].getPopup().setContent(popupText);
                     } else {
-                        const marker = L.marker([info.lat, info.lon]).addTo(map).bindPopup(popupText);
-                        markerMap[name] = marker;
+                        markerMap[name] = L.marker([info.lat, info.lon]).addTo(map).bindPopup(popupText);
                     }
 
                     if (info.historie && info.historie.length > 1) {
                         if (linienMap[name]) { map.removeLayer(linienMap[name]); }
-                        const linie = L.polyline(info.historie, {color: '#007bff', weight: 4, opacity: 0.7}).addTo(map);
-                        linienMap[name] = linie;
-                    }
-                }
-                
-                for (const name in markerMap) {
-                    if (!daten[name]) {
-                        map.removeLayer(markerMap[name]);
-                        delete markerMap[name];
-                        if (linienMap[name]) { map.removeLayer(linienMap[name]); delete linienMap[name]; }
+                        linienMap[name] = L.polyline(info.historie, {color: '#2563eb', weight: 4, opacity: 0.6}).addTo(map);
                     }
                 }
 
-                const container = document.getElementById('geraete-liste-container');
-                if (!container) return;
-                const gerateKeys = Object.keys(daten);
-                
-                if (gerateKeys.length === 0) {
-                    container.innerHTML = "<i>Keine Geräte aktiv</i>";
+                // 2. Dropdown für Fernsteuerung befüllen (nur wenn sich die Anzahl ändert)
+                const devSelect = document.getElementById('deviceSelect');
+                const aktuellerWert = devSelect.value;
+                devSelect.innerHTML = '<option value="">-- Gerät auswählen --</option>';
+                for (const name in daten) {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    if(name === aktuellerWert) opt.selected = true;
+                    devSelect.appendChild(opt);
+                }
+                if(devSelect.value) { updateAppDropdown(); }
+
+                // 3. Tabelle generieren
+                const tbody = document.getElementById('device-table-body');
+                const keys = Object.keys(daten);
+                if (keys.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 20px;">Keine Geräte aktiv</td></tr>';
                     return;
                 }
-                
-                let html = '<ul style="list-style: none; padding: 0; margin: 0;">';
+
+                let html = "";
                 const jetzt = Math.floor(Date.now() / 1000);
-                
+
                 for (const name in daten) {
                     const info = daten[name];
-                    const ts = info.zeitstempel || jetzt;
-                    const diffSekunden = jetzt - ts;
-                    
-                    let handyZeitText = diffSekunden < 60 ? "vor " + diffSekunden + " Sek." : "vor " + Math.floor(diffSekunden / 60) + " Min.";
-                    let akkuFarbe = "#28a745"; 
-                    if (parseInt(info.akku) <= 20) akkuFarbe = "#dc3545";
-                    else if (parseInt(info.akku) <= 50) akkuFarbe = "#ffc107";
-                    
-                    html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
-                            '<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">' +
-                            '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
-                            '<span style="color: ' + akkuFarbe + '; font-weight: bold;">🔋 ' + info.akku + '%</span>' +
-                            '<span style="color: #17a2b8; font-weight: bold;">🚀 ' + info.speed + ' km/h</span>' +
-                            '<span style="color: #6f42c1; font-weight: bold;">🌐 ' + info.netzwerk + '</span>' +
-                            '<span style="color: #e83e8c; font-weight: bold;">📱 Offen: ' + info.aktuelle_app + '</span>' +
-                            '<span style="color: #ff8c00; font-weight: bold;">♿ Systemhilfe: ' + info.bedienungshilfen + '</span>' +
-                            '<span style="color: #6c757d;">📡 Funkspruch: <b>' + handyZeitText + '</b></span>' +
-                            '</div>' +
-                            '<div style="display: flex; gap: 10px;">' +
-                            '<a href="/steuerung/' + encodeURIComponent(name) + '" style="background-color: #007bff; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">Steuerung 🛠️</a>' +
-                            '<a href="/delete/' + encodeURIComponent(name) + '" style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" onclick="return confirm(this.title);" title="Gerät wirklich löschen?">Löschen 🗑️</a>' +
-                            '</div>' +
-                            '</li>';
+                    const diff = jetzt - (info.zeitstempel || jetzt);
+                    let zeitText = diff < 60 ? "vor " + diff + " Sek." : "vor " + Math.floor(diff / 60) + " Min.";
+
+                    // Akku Badge Farbe festlegen
+                    let akkuKlasse = "badge-success";
+                    if (parseInt(info.akku) <= 20) akkuKlasse = "badge-danger";
+                    else if (parseInt(info.akku) <= 50) akkuKlasse = "badge-warning";
+
+                    // Dynamische Abfang-Badges je nach Typ (Block, Push oder normale App)
+                    let appBadgeHTML = "";
+                    let roherText = info.aktuelle_app;
+                    if(roherText.includes("[BLOCKIERT]")) {
+                        appBadgeHTML = '<span class="badge badge-danger" style="display:block; margin-bottom:4px;">🚫 Sperre ausgelöst</span><small style="color:#b91c1c; font-weight:bold;">' + roherText.replace("[BLOCKIERT] ","") + '</small>';
+                    } else if(roherText.includes("[🔔 PUSH")) {
+                        appBadgeHTML = '<span class="badge badge-purple" style="display:block; margin-bottom:4px;">🔔 Push abgefangen</span><small style="color:#581c87; font-weight:600; display:block; background:#f3e8ff; padding:4px; border-radius:4px;">' + roherText.split("]: ")[1] + '</small>';
+                    } else {
+                        appBadgeHTML = '<span class="badge badge-info">' + roherText + '</span>';
+                    }
+
+                    html += '<tr>' +
+                        '<td><strong style="color:#0f172a;">🟢 ' + name + '</strong></td>' +
+                        '<td><span class="badge ' + akkuKlasse + '">' + info.akku + '%</span></td>' +
+                        '<td><span class="badge badge-info">' + info.speed + ' km/h</span></td>' +
+                        '<td><span class="badge badge-warning">' + info.netzwerk + '</span></td>' +
+                        '<td style="max-width:350px; word-wrap:break-word;">' + appBadgeHTML + '</td>' +
+                        '<td><span class="badge badge-success">♿ ' + info.bedienungshilfen + '</span></td>' +
+                        '<td><small style="color:#64748b; font-weight:600;">' + zeitText + '</small></td>' +
+                        '<td style="text-align: right;"><a href="/delete/' + encodeURIComponent(name) + '" class="badge badge-danger" style="text-decoration:none;" onclick="return confirm(\'Gerät löschen?\');">Löschen 🗑️</a></td>' +
+                    '</tr>';
                 }
-                html += '</ul>';
-                container.innerHTML = html;
+                tbody.innerHTML = html;
+            }
+
+            function updateAppDropdown() {
+                const devSelect = document.getElementById('deviceSelect');
+                const appSelect = document.getElementById('appSelect');
+                const gewaehltesGeraet = devSelect.value;
+
+                if (!gewaehltesGeraet || !geraete[gewaehltesGeraet]) {
+                    appSelect.innerHTML = '<option value="">-- Zuerst Gerät wählen --</option>';
+                    appSelect.disabled = true;
+                    return;
+                }
+
+                appSelect.disabled = false;
+                let appsRaw = geraete[gewaehltesGeraet].installierte_apps;
+                if (typeof appsRaw === 'string') { try { appsRaw = JSON.parse(appsRaw); } catch(e) { appsRaw = []; } }
+
+                if (Array.isArray(appsRaw) && appsRaw.length > 0) {
+                    appSelect.innerHTML = '<option value="">-- Bitte App auswählen --</option>';
+                    appsRaw.forEach(app => {
+                        const opt = document.createElement('option');
+                        opt.value = app.paket;
+                        opt.textContent = app.name;
+                        appSelect.appendChild(opt);
+                    });
+                } else {
+                    appSelect.innerHTML = '<option disabled selected>Keine Apps vom Gerät gemeldet</option>';
+                }
+            }
+
+            function sendeRemoteBefehl() {
+                const geraeteName = document.getElementById('deviceSelect').value;
+                const paketName = document.getElementById('appSelect').value;
+
+                if (!geraeteName || !paketName) {
+                    alert("Bitte wähle ein Gerät und eine Ziel-App aus!");
+                    return;
+                }
+
+                if (confirm("Soll der App-Startbefehl an das Handy gesendet werden?")) {
+                    fetch('/api/sende_befehl', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: geraeteName, paket: paketName })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === "success") { alert("Erfolgreich gespeichert! Das Handy startet die App beim nächsten Funkspruch."); }
+                        else { alert("Fehler: " + data.error); }
+                    });
+                }
             }
 
             function datenVomServerHolen() {
@@ -225,161 +398,18 @@ def index():
                     .then(neueDaten => {
                         updateUI(neueDaten);
                         letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
-                        const seitElem = document.getElementById('zeit-seit-update');
-                        if(seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
-                    })
-                    .catch(err => { console.error("Fehler beim Live-Update:", err); });
+                        document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
+                    });
             }
 
             window.addEventListener('DOMContentLoaded', startKarte);
         </script>
-        """.replace("%ERSATZ_FUER_DATEN%", json_daten)
-
-    basis_html = """
-    <html>
-        <head>
-            <title>App Management Dashboard</title>
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; }
-                .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-                #map { height: 500px; width: 100%; border-radius: 8px; background-color: #ddd; }
-                .btn { display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; }
-                .btn:hover { background-color: #218838; }
-                .animate-fade { animation: fadeIn 0.5s ease-in; }
-                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h2>📲 Öffentlicher App-Download</h2>
-                <p>Hier kann jeder die aktuelle Version der App auf sein Android-Smartphone laden:</p>
-                <a href="/download" class="btn">📥 APK Herunterladen</a>
-            </div>
-            %LOGIN_BEREICH%
-            %KARTE_BEREICH%
-            %JAVASCRIPT_BEREICH%
-        </body>
+    </body>
     </html>
-    """
-    return basis_html.replace("%LOGIN_BEREICH%", login_html).replace("%KARTE_BEREICH%", karte_html).replace("%JAVASCRIPT_BEREICH%", javascript_html)
+    """.replace("%ERSATZ_FUER_DATEN%", json_daten)
+    return dashboard_html
 
-# ================= SEPARATE STEUERUNGS-SEITE =================
-@app.route('/steuerung/<name>', methods=['GET'])
-def steuerungs_seite(name):
-    if not session.get('eingeloggt', False):
-        return redirect(url_for('index'))
-        
-    alle_geraete = hole_daten_von_supabase()
-    if name not in alle_geraete:
-        return f"<h3>Gerät '{name}' nicht gefunden.</h3><a href='/'>Zurück</a>", 404
-        
-    geraet = alle_geraete[name]
-    raw_apps = geraet.get("installierte_apps", "[]")
-    
-    if isinstance(raw_apps, str):
-        apps_json_string = raw_apps if raw_apps.strip() else "[]"
-    else:
-        apps_json_string = json.dumps(raw_apps)
-
-    if apps_json_string == "[]" or not apps_json_string:
-        apps_json_string = "[]"
-
-    html_steuerung = """
-    <html>
-        <head>
-            <title>Fernsteuerung - %GERAETE_NAME%</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
-                .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
-                h1 { color: #007bff; font-size: 24px; margin-top: 0; }
-                .status-item { font-size: 15px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
-                select { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #007bff; border-radius: 6px; margin: 20px 0; outline: none; }
-                button { width: 100%; background-color: #28a745; color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }
-                button:hover { background-color: #218838; }
-                .back-link { display: block; text-align: center; margin-top: 20px; color: #007bff; text-decoration: none; font-weight: bold; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <h1>🛠️ Fernsteuerungs-Zentrale</h1>
-                <div class="status-item"><b>Gerät:</b> %GERAETE_NAME%</div>
-                <div class="status-item"><b>Aktuelle App im Vordergrund:</b> <span style="color:#e83e8c; font-weight:bold;">%OFFENE_APP%</span></div>
-                <div class="status-item"><b>Systemhilfe-Rechte:</b> %ACCESSIBILITY%</div>
-                
-                <p>Wähle eine installierte App aus, um sie per Remote-Befehl auf dem Handy aufzurufen:</p>
-                
-                <select id="appSelect">
-                    <option value="">-- Bitte App auswählen --</option>
-                </select>
-                
-                <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl abschicken</button>
-                
-                <a href="/" class="back-link">↩️ Zurück zur Hauptseite</a>
-            </div>
-
-            <script>
-                let appListeRaw = %APPS_ARRAY%;
-                const selectElement = document.getElementById('appSelect');
-                
-                if (typeof appListeRaw === 'string') {
-                    try {
-                        appListeRaw = JSON.parse(appListeRaw);
-                    } catch(e) {
-                        console.error("Fehler beim Parsen:", e);
-                        appListeRaw = [];
-                    }
-                }
-                
-                if(Array.isArray(appListeRaw) && appListeRaw.length > 0) {
-                    selectElement.innerHTML = '<option value="">-- Bitte App auswählen --</option>';
-                    appListeRaw.forEach(app => {
-                        const opt = document.createElement('option');
-                        opt.value = app.paket;
-                        opt.textContent = app.name + " (" + app.paket + ")";
-                        selectElement.appendChild(opt);
-                    });
-                } else {
-                    selectElement.innerHTML = '<option disabled selected>Keine Apps vom Gerät gemeldet</option>';
-                }
-
-                function sendeRemoteBefehl() {
-                    const paketName = selectElement.value;
-                    if(!paketName) {
-                        alert("Bitte wähle zuerst eine App aus!");
-                        return;
-                    }
-                    
-                    if(confirm("Soll der Befehl zum Öffnen der App abgeschickt werden?")) {
-                        fetch('/api/sende_befehl', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                name: "%GERAETE_NAME%",
-                                paket: paketName
-                            })
-                        })
-                        .then(res => res.json())
-                        .then(data => {
-                            if(data.status === "success") {
-                                alert("Befehl gespeichert! Das Handy startet die App beim nächsten Funkspruch.");
-                                window.location.href = "/";
-                            } else {
-                                alert("Fehler: " + data.error);
-                            }
-                        })
-                        .catch(err => alert("Netzwerkfehler beim Senden."));
-                    }
-                }
-            </script>
-        </body>
-    </html>
-    """
-    return html_steuerung.replace("%GERAETE_NAME%", name)\
-                         .replace("%OFFENE_APP%", geraet["aktuelle_app"])\
-                         .replace("%ACCESSIBILITY%", geraet["bedienungshilfen"])\
-                         .replace("%APPS_ARRAY%", apps_json_string)
+# ================= API ENDPUNKTE & HILFSFUNKTIONEN =================
 
 @app.route('/api/sende_befehl', methods=['POST'])
 def speichere_befehl():
@@ -406,8 +436,6 @@ def speichere_befehl():
         return jsonify({"error": "Datenbank-Fehler"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# ==================================================================
 
 @app.route('/api/data', methods=['GET'])
 def get_live_data():
@@ -436,7 +464,6 @@ def upload():
         return jsonify({"error": "Missing JSON"}), 400
         
     data = request.get_json()
-    
     roher_name = str(data.get("name", "Unbekanntes Gerät"))
     absender_ip = request.remote_addr or "IP"
     geraete_name = f"{roher_name} ({absender_ip[-4:]})"
@@ -490,7 +517,6 @@ def upload():
     }
 
     try:
-        # 🔥 KORREKTUR: on_conflict Parameter angehängt für automatisches Überschreiben
         supabase_post_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?on_conflict=name"
         headers_upsert = SUPABASE_HEADERS.copy()
         headers_upsert["Prefer"] = "return=representation,resolution=merge-duplicates"
