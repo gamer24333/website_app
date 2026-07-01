@@ -24,7 +24,7 @@ SUPABASE_HEADERS = {
 }
 
 def hole_daten_von_supabase():
-    """L&auml;dt alle aktiven Ger&auml;te aus der Supabase-Datenbank."""
+    """Laedt alle aktiven Geraete aus der Supabase-Datenbank."""
     try:
         url = f"{SUPABASE_URL}/rest/v1/geraete_daten?select=*"
         antwort = requests.get(url, headers=SUPABASE_HEADERS, timeout=5)
@@ -207,12 +207,12 @@ def index():
             let markerMap = {};
             let linienMap = {};
             
-            // Initialisierung als leeres Objekt, um Template-Injektionsfehler zu vermeiden
+            // Absolut statisch initialisiert. Keine Jinja-Injektion mehr hier!
             let geraete = {};
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
+            let kartenZentrierungErfolgt = false;
 
             function startKarte() {
-                // Standard-Zentrierung (Deutschland)
                 let centerLat = 51.1657;
                 let centerLon = 10.4515;
                 let zoomLevel = 5;
@@ -222,7 +222,7 @@ def index():
                     attribution: '&copy; OpenStreetMap'
                 }).addTo(map);
 
-                // Erste Datenabfrage direkt nach der Karteninitialisierung ausführen
+                // Holt die Live-Daten asynchron über die API-Route ein
                 datenVomServerHolen();
 
                 setInterval(function() {
@@ -375,17 +375,20 @@ def index():
                     .then(neueDaten => {
                         updateUI(neueDaten);
                         
-                        // Dynamische Zentrierung der Karte beim ersten erfolgreichen Laden der Daten
-                        const keys = Object.keys(neueDaten);
-                        if (keys.length > 0 && neueDaten[keys[0]]) {
-                            let centerLat = neueDaten[keys[0]].lat || 51.1657;
-                            let centerLon = neueDaten[keys[0]].lon || 10.4515;
-                            map.setView([centerLat, centerLon], 12);
+                        // Einmalige automatische Fokussierung auf das erste gefundene Handy
+                        if (!kartenZentrierungErfolgt) {
+                            const keys = Object.keys(neueDaten);
+                            if (keys.length > 0 && neueDaten[keys[0]]) {
+                                let centerLat = neueDaten[keys[0]].lat || 51.1657;
+                                let centerLon = neueDaten[keys[0]].lon || 10.4515;
+                                map.setView([centerLat, centerLon], 13);
+                                kartenZentrierungErfolgt = true;
+                            }
                         }
                         
                         letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
                         document.getElementById('zeit-seit-update').innerHTML = "⏱&FE0F; Letzter Webseiten-Abruf: Gerade eben";
-                    }).catch(err => console.error("Fehler beim Abruf der Live-Daten:", err));
+                    }).catch(e => console.error("API-Abruffehler:", e));
             }
 
             window.addEventListener('DOMContentLoaded', startKarte);
@@ -394,6 +397,7 @@ def index():
     </html>
     """
     return render_template_string(dashboard_html)
+
 # ================= API ENDPUNKTE =================
 
 @app.route('/api/sende_befehl', methods=['POST'])
