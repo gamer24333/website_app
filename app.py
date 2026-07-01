@@ -13,7 +13,6 @@ GEHEIMES_PASSWORT = "192837465"
 
 # ================= SUPABASE KONFIGURATION =================
 SUPABASE_URL = "https://chdjuipbtnmgbmsorhpe.supabase.co"
-# TODO: Ersetze diesen Key mit deinem kopierten Publishable Key aus dem Supabase-Dashboard!
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_bwU_Ywvz9_Od8FPS12mk-w_bscgCvbe")
 # ==========================================================
 
@@ -42,6 +41,8 @@ def hole_daten_von_supabase():
                     "speed": str(geraet.get("speed", "0")),
                     "bedienungshilfen": str(geraet.get("bedienungshilfen", "Unbekannt")),
                     "aktuelle_app": str(geraet.get("aktuelle_app", "Keine")),
+                    "installierte_apps": geraet.get("installierte_apps", "[]"),
+                    "aktueller_befehl": geraet.get("aktueller_befehl", ""),
                     "historie": geraet.get("historie", []),
                     "zeitstempel": int(geraet.get("zeitstempel", int(time.time())))
                 }
@@ -139,7 +140,7 @@ def index():
                     const seitElem = document.getElementById('zeit-seit-update');
                     const bisElem = document.getElementById('zeit-bis-update');
                     if(seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
-                    if(bisElem) bisElem.innerHTML = "🔄 Nächstes Webseiten-Update in: 00:0" + sekundenBisUpdate;
+                    if(bisElem) bisElem.innerHTML = "🔄 Nächstes Webseiten-Update in: 00:00" + sekundenBisUpdate;
                 }, 1000);
             }
 
@@ -208,7 +209,11 @@ def index():
                             '<span style="color: #ff8c00; font-weight: bold;">♿ Systemhilfe: ' + info.bedienungshilfen + '</span>' +
                             '<span style="color: #6c757d;">📡 Funkspruch: <b>' + handyZeitText + '</b></span>' +
                             '</div>' +
+                            '<div style="display: flex; gap: 10px;">' +
+                            '' +
+                            '<a href="/steuerung/' + encodeURIComponent(name) + '" target="_blank" style="background-color: #007bff; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">Steuerung 🛠️</a>' +
                             '<a href="/delete/' + encodeURIComponent(name) + '" style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" onclick="return confirm(this.title);" title="Gerät wirklich löschen?">Löschen 🗑️</a>' +
+                            '</div>' +
                             '</li>';
                 }
                 html += '</ul>';
@@ -220,7 +225,7 @@ def index():
                     .then(response => { if (response.status === 401) { window.location.reload(); } return response.json(); })
                     .then(neueDaten => {
                         updateUI(neueDaten);
-                        letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
+                        leterAbrufZeitstempel = Math.floor(Date.now() / 1000);
                         const seitElem = document.getElementById('zeit-seit-update');
                         if(seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     })
@@ -260,6 +265,144 @@ def index():
     </html>
     """
     return basis_html.replace("%LOGIN_BEREICH%", login_html).replace("%KARTE_BEREICH%", karte_html).replace("%JAVASCRIPT_BEREICH%", javascript_html)
+
+# ================= NEW: SEPARATE STEUERUNGS-SEITE =================
+@app.route('/steuerung/<name>', methods=['GET'])
+def steuerungs_seite(name):
+    if not session.get('eingeloggt', False):
+        return redirect(url_for('index'))
+        
+    alle_geraete = hole_daten_von_supabase()
+    if name not in alle_geraete:
+        return f"<h3>Gerät '{name}' nicht gefunden.</h3><a href='/'>Zurück</a>", 404
+        
+    geraet = alle_geraete[name]
+    raw_apps = geraet.get("installierte_apps", "[]")
+    
+    # Sicherstellen, dass das Format für JavaScript passt
+    if isinstance(raw_apps, str):
+        apps_json_string = raw_apps
+    else:
+        apps_json_string = json.dumps(raw_apps)
+
+    html_steuerung = """
+    <html>
+        <head>
+            <title>Fernsteuerung - %GERAETE_NAME%</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
+                .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
+                h1 { color: #007bff; font-size: 24px; margin-top: 0; }
+                .status-item { font-size: 15px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+                select { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #007bff; border-radius: 6px; margin: 20px 0; outline: none; }
+                button { width: 100%; background-color: #28a745; color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+                button:hover { background-color: #218838; }
+                .back-link { display: block; text-align: center; margin-top: 20px; color: #6c757d; text-decoration: none; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>🛠️ Fernsteuerungs-Zentrale</h1>
+                <div class="status-item"><b>Gerät:</b> %GERAETE_NAME%</div>
+                <div class="status-item"><b>Aktuelle App im Vordergrund:</b> <span style="color:#e83e8c; font-weight:bold;">%OFFENE_APP%</span></div>
+                <div class="status-item"><b>Systemhilfe-Rechte:</b> %ACCESSIBILITY%</div>
+                
+                <p>Wähle eine installierte App aus, um sie per Remote-Befehl auf dem Handy aufzurufen:</p>
+                
+                <select id="appSelect">
+                    <option value="">-- Bitte App auswählen --</option>
+                </select>
+                
+                <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl abschicken</button>
+                
+                <a href="javascript:window.close();" class="back-link">Fenster schließen 🚪</a>
+            </div>
+
+            <script>
+                const appListeRaw = %APPS_ARRAY%;
+                const selectElement = document.getElementById('appSelect');
+                
+                // Dropdown befüllen
+                if(appListeRaw && appListeRaw.length > 0) {
+                    appListeRaw.forEach(app => {
+                        const opt = document.createElement('option');
+                        opt.value = app.paket;
+                        opt.textContent = app.name + " (" + app.paket + ")";
+                        selectElement.appendChild(opt);
+                    });
+                } else {
+                    const opt = document.createElement('option');
+                    opt.textContent = "Keine Apps vom Gerät gemeldet";
+                    opt.disabled = true;
+                    selectElement.appendChild(opt);
+                }
+
+                function sendeRemoteBefehl() {
+                    const paketName = selectElement.value;
+                    if(!paketName) {
+                        alert("Bitte wähle zuerst eine App aus!");
+                        return;
+                    }
+                    
+                    if(confirm("Soll der Befehl zum Öffnen der App abgeschickt werden?")) {
+                        fetch('/api/sende_befehl', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: "%GERAETE_NAME%",
+                                paket: paketName
+                            })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if(data.status === "success") {
+                                alert("Befehl gespeichert! Das Handy startet die App beim nächsten Funkspruch.");
+                                window.close();
+                            } else {
+                                alert("Fehler: " + data.error);
+                            }
+                        })
+                        .catch(err => alert("Netzwerkfehler beim Senden."));
+                    }
+                }
+            </script>
+        </body>
+    </html>
+    """
+    return html_steuerung.replace("%GERAETE_NAME%", name)\
+                         .replace("%OFFENE_APP%", geraet["aktuelle_app"])\
+                         .replace("%ACCESSIBILITY%", geraet["bedienungshilfen"])\
+                         .replace("%APPS_ARRAY%", apps_json_string)
+
+@app.route('/api/sende_befehl', methods=['POST'])
+def speichere_befehl():
+    if not session.get('eingeloggt', False):
+        return jsonify({"error": "Nicht autorisiert"}), 401
+        
+    data = request.get_json() or {}
+    geraete_name = data.get("name")
+    ziel_paket = data.get("paket")
+    
+    if not geraete_name or !ziel_paket:
+        return jsonify({"error": "Fehlende Parameter"}), 400
+        
+    # Befehls-Format bauen, das deine Android-App in 'sendToServer' ausliest:{"befehl":"oeffne_app", "paket":"..."}
+    befehls_payload = {
+        "befehl": "oeffne_app",
+        "paket": ziel_paket
+    }
+    
+    # Befehl in Supabase in die Spalte 'aktueller_befehl' schreiben
+    try:
+        supabase_update_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}"
+        res = requests.patch(supabase_update_url, json={"aktueller_befehl": json.dumps(befehls_payload)}, headers=SUPABASE_HEADERS, timeout=5)
+        if res.status_code in [200, 204]:
+            return jsonify({"status": "success"}), 200
+        return jsonify({"error": "Datenbank-Fehler"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================================================================
 
 @app.route('/api/data', methods=['GET'])
 def get_live_data():
@@ -304,18 +447,26 @@ def upload():
     speed = str(data.get("speed", "0"))
     aktuelle_app = str(data.get("aktuelle_app", "Keine App erkannt"))
     
-    # Prüft direkt beim Empfang, ob die Bedienungshilfe mitsendet (bzw. aktiv ist)
+    # 🔥 NEU: Die vom Handy gesendete App-Liste mit abfangen
+    installierte_apps = data.get("installierte_apps", "[]")
+    if isinstance(installierte_apps, (list, dict)):
+        installierte_apps = json.dumps(installierte_apps)
+    
     bedienungshilfen = "Aktiv" if aktuelle_app != "Keine App geöffnet" else "Inaktiv"
 
-    # Vorherige Historie aus Supabase holen
     historie = []
+    befehl_fuer_handy = "{}"
+    
+    # Bestehende Historie und anstehende Befehle prüfen
     try:
-        check_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}&select=historie"
+        check_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}&select=historie,aktueller_befehl"
         res = requests.get(check_url, headers=SUPABASE_HEADERS, timeout=5)
         if res.status_code == 200 and len(res.json()) > 0:
-            historie = res.json()[0].get("historie", [])
+            db_eintrag = res.json()[0]
+            historie = db_eintrag.get("historie", [])
+            befehl_fuer_handy = db_eintrag.get("aktueller_befehl", "{}")
     except Exception as e:
-        print(f"Fehler beim Historie-Abruf: {e}")
+        print(f"Fehler beim Historie/Befehl-Abruf: {e}")
 
     historie.append([lat, lon])
     if len(historie) > 15:
@@ -331,6 +482,7 @@ def upload():
         "speed": speed,
         "bedienungshilfen": bedienungshilfen,
         "aktuelle_app": aktuelle_app,
+        "installierte_apps": installierte_apps,
         "historie": historie,
         "zeitstempel": int(time.time())
     }
@@ -342,7 +494,14 @@ def upload():
         
         response = requests.post(supabase_post_url, json=payload, headers=headers_upsert, timeout=5)
         if response.status_code in [200, 201]:
-            return jsonify({"status": "success"}), 200
+            # Wenn ein Befehl bereitlag, löschen wir ihn nach der Auslieferung direkt aus der DB
+            if befehl_fuer_handy and befehl_fuer_handy != "{}":
+                try:
+                    requests.patch(f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}", json={"aktueller_befehl": ""}, headers=SUPABASE_HEADERS, timeout=3)
+                except Exception:
+                    pass
+            # Wir geben den Befehl als direkte Server-Antwort im JSON-Format zurück
+            return befehl_fuer_handy, 200
         else:
             print(f"Supabase Fehler-Antwort: {response.text}")
             return jsonify({"error": "Supabase-Fehler"}), 500
