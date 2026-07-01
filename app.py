@@ -199,7 +199,6 @@ def index():
                     if (parseInt(info.akku) <= 20) akkuFarbe = "#dc3545";
                     else if (parseInt(info.akku) <= 50) akkuFarbe = "#ffc107";
                     
-                    // KORREKTUR: target="_blank" entfernt, öffnet jetzt auf gleicher Seite
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
                             '<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">' +
                             '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
@@ -279,7 +278,6 @@ def steuerungs_seite(name):
     geraet = alle_geraete[name]
     raw_apps = geraet.get("installierte_apps", "[]")
     
-    # Sicherstellen, dass es für JavaScript als valide JSON-Zeichenkette übergeben wird
     if isinstance(raw_apps, str):
         apps_json_string = raw_apps if raw_apps.strip() else "[]"
     else:
@@ -325,7 +323,6 @@ def steuerungs_seite(name):
                 let appListeRaw = %APPS_ARRAY%;
                 const selectElement = document.getElementById('appSelect');
                 
-                // Falls als reiner String übergeben, hier parsen
                 if (typeof appListeRaw === 'string') {
                     try {
                         appListeRaw = JSON.parse(appListeRaw);
@@ -335,7 +332,6 @@ def steuerungs_seite(name):
                     }
                 }
                 
-                // Dropdown befüllen
                 if(Array.isArray(appListeRaw) && appListeRaw.length > 0) {
                     selectElement.innerHTML = '<option value="">-- Bitte App auswählen --</option>';
                     appListeRaw.forEach(app => {
@@ -394,7 +390,6 @@ def speichere_befehl():
     geraete_name = data.get("name")
     ziel_paket = data.get("paket")
     
-    # KORREKTUR: logischen Ausdruck berichtigt und Python 'not' verwendet
     if not geraete_name or not ziel_paket:
         return jsonify({"error": "Fehlende Parameter"}), 400
         
@@ -495,9 +490,10 @@ def upload():
     }
 
     try:
-        supabase_post_url = f"{SUPABASE_URL}/rest/v1/geraete_daten"
+        # 🔥 KORREKTUR: on_conflict Parameter angehängt für automatisches Überschreiben
+        supabase_post_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?on_conflict=name"
         headers_upsert = SUPABASE_HEADERS.copy()
-        headers_upsert["Prefer"] = "resolution=merge-duplicates"
+        headers_upsert["Prefer"] = "return=representation,resolution=merge-duplicates"
         
         response = requests.post(supabase_post_url, json=payload, headers=headers_upsert, timeout=5)
         if response.status_code in [200, 201]:
