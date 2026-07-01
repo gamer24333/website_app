@@ -12,8 +12,8 @@ app.secret_key = os.environ.get("SECRET_KEY", "ein_zufaelliger_geheimer_schluess
 GEHEIMES_PASSWORT = "192837465"
 
 # ================= SUPABASE KONFIGURATION =================
-# TODO: Ersetze diese beiden Werte mit deinen echten Supabase-Daten!
 SUPABASE_URL = "https://chdjuipbtnmgbmsorhpe.supabase.co"
+# TODO: Ersetze diesen Key mit deinem kopierten Publishable Key aus dem Supabase-Dashboard!
 SUPABASE_KEY = "sb_publishable_bwU_Ywvz9_Od8FPS12mk-w_bscgCvbe"
 # ==========================================================
 
@@ -21,7 +21,7 @@ SUPABASE_HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type": "application/json",
-    "Prefer": "resolution=merge-duplicates" # Erlaubt das Aktualisieren (Upsert)
+    "Prefer": "resolution=merge-duplicates"
 }
 
 def hole_daten_von_supabase():
@@ -31,7 +31,6 @@ def hole_daten_von_supabase():
         antwort = requests.get(url, headers=SUPABASE_HEADERS, timeout=5)
         if antwort.status_code == 200:
             daten_liste = antwort.json()
-            # Umwandeln in das gewohnte Dictionary-Format für die Webseite
             geraete_dict = {}
             for geraet in daten_liste:
                 name = geraet["name"]
@@ -41,6 +40,8 @@ def hole_daten_von_supabase():
                     "akku": str(geraet.get("akku", "??")),
                     "netzwerk": str(geraet.get("netzwerk", "Aktiv")),
                     "speed": str(geraet.get("speed", "0")),
+                    "bedienungshilfen": str(geraet.get("bedienungshilfen", "Unbekannt")),
+                    "aktuelle_app": str(geraet.get("aktuelle_app", "Keine")),
                     "historie": geraet.get("historie", []),
                     "zeitstempel": int(geraet.get("zeitstempel", int(time.time())))
                 }
@@ -150,7 +151,7 @@ def index():
                     const info = daten[name];
                     if (!info.lat || !info.lon) continue;
 
-                    const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>🚀 Tempo: " + info.speed + " km/h<br>🌐 Netz: " + info.netzwerk;
+                    const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>🚀 Tempo: " + info.speed + " km/h<br>📱 App: " + info.aktuelle_app;
                     
                     if (markerMap[name]) {
                         markerMap[name].setLatLng([info.lat, info.lon]);
@@ -198,12 +199,14 @@ def index():
                     else if (parseInt(info.akku) <= 50) akkuFarbe = "#ffc107";
                     
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
-                            '<div>' +
+                            '<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">' +
                             '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
-                            '<span style="margin-left: 15px; color: ' + akkuFarbe + '; font-weight: bold;">🔋 ' + info.akku + '% Akku</span>' +
-                            '<span style="margin-left: 15px; color: #17a2b8; font-weight: bold;">🚀 ' + info.speed + ' km/h</span>' +
-                            '<span style="margin-left: 15px; color: #6f42c1; font-weight: bold;">🌐 ' + info.netzwerk + '</span>' +
-                            '<span style="color: #6c757d; margin-left: 15px;">📡 Letzter Funkspruch: <b>' + handyZeitText + '</b></span>' +
+                            '<span style="color: ' + akkuFarbe + '; font-weight: bold;">🔋 ' + info.akku + '%</span>' +
+                            '<span style="color: #17a2b8; font-weight: bold;">🚀 ' + info.speed + ' km/h</span>' +
+                            '<span style="color: #6f42c1; font-weight: bold;">🌐 ' + info.netzwerk + '</span>' +
+                            '<span style="color: #e83e8c; font-weight: bold;">📱 Offen: ' + info.aktuelle_app + '</span>' +
+                            '<span style="color: #ff8c00; font-weight: bold;">♿ Systemhilfe: ' + info.bedienungshilfen + '</span>' +
+                            '<span style="color: #6c757d;">📡 Funkspruch: <b>' + handyZeitText + '</b></span>' +
                             '</div>' +
                             '<a href="/delete/' + encodeURIComponent(name) + '" style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" onclick="return confirm(this.title);" title="Gerät wirklich löschen?">Löschen 🗑️</a>' +
                             '</li>';
@@ -299,8 +302,12 @@ def upload():
     akku = str(data.get("akku", "??"))
     netzwerk = str(data.get("netzwerk", "Unbekannt"))
     speed = str(data.get("speed", "0"))
+    aktuelle_app = str(data.get("aktuelle_app", "Keine App erkannt"))
     
-    # Vorherige Historie aus Supabase holen, falls das Gerät schon existiert
+    # Prüft direkt beim Empfang, ob die Bedienungshilfe mitsendet (bzw. aktiv ist)
+    bedienungshilfen = "Aktiv" if aktuelle_app != "Keine App geöffnet" else "Inaktiv"
+
+    # Vorherige Historie aus Supabase holen
     historie = []
     try:
         check_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}&select=historie"
@@ -314,7 +321,7 @@ def upload():
     if len(historie) > 15:
         historie.pop(0)
 
-    # Payload für das Speichern in Supabase bauen
+    # Payload für Supabase zusammenstellen
     payload = {
         "name": geraete_name,
         "lat": lat,
@@ -322,11 +329,12 @@ def upload():
         "akku": akku,
         "netzwerk": netzwerk,
         "speed": speed,
+        "bedienungshilfen": bedienungshilfen,
+        "aktuelle_app": aktuelle_app,
         "historie": historie,
         "zeitstempel": int(time.time())
     }
 
-    # Überträgt die Daten zu Supabase (Erstellt neu oder überschreibt bei gleichem Namen)
     try:
         supabase_post_url = f"{SUPABASE_URL}/rest/v1/geraete_daten"
         headers_upsert = SUPABASE_HEADERS.copy()
