@@ -2,7 +2,7 @@ import os
 import json
 import time
 import requests
-from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for, render_template_string
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -71,7 +71,6 @@ def index():
         """
     
     sichere_daten = hole_daten_von_supabase()
-    json_daten = json.dumps(sichere_daten)
     
     dashboard_html = """
     <!DOCTYPE html>
@@ -86,7 +85,6 @@ def index():
             * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
             body { background: #f8fafc; color: #1e293b; display: flex; height: 100vh; overflow: hidden; }
             
-            /* Sidebar Navigation */
             .sidebar { width: 260px; background: #0f172a; color: white; padding: 25px 20px; display: flex; flex-direction: column; justify-content: space-between; }
             .sidebar-brand { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #38bdf8; display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
             .nav-item { padding: 12px 15px; border-radius: 8px; color: #94a3b8; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; transition: all 0.2s; }
@@ -94,35 +92,29 @@ def index():
             .btn-logout { color: #f1f5f9; background: #ef4444; text-align: center; justify-content: center; margin-top: auto; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;}
             .btn-logout:hover { background: #dc2626; }
 
-            /* Hauptinhalt */
             .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 30px; }
             .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
             .header-title h1 { font-size: 26px; color: #0f172a; font-weight: 700; }
             
-            /* Status Banner */
             .status-banner { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 25px; color: #64748b; flex-wrap: wrap; align-items: center; }
             .refresh-btn { background: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: background 0.2s; }
             .refresh-btn:hover { background: #1d4ed8; }
 
-            /* Grid Layout */
             .grid-container { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
             @media (max-width: 900px) { .grid-container { grid-template-columns: 1fr; } }
             
             .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 25px; }
             .card-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
             
-            /* UI Elemente */
             #map { height: 450px; width: 100%; border-radius: 10px; background: #e2e8f0; border: 1px solid #cbd5e1; }
             .download-box { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; }
             .btn-download { display: inline-block; background: white; color: #0369a1; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: transform 0.2s; }
             .btn-download:hover { transform: translateY(-1px); }
 
-            /* Tabelle & Listen */
             .device-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
             .device-table th { background: #f8fafc; color: #64748b; font-weight: 600; padding: 12px; border-bottom: 2px solid #e2e8f0; }
             .device-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
             
-            /* Badges */
             .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
             .badge-success { background: #dcfce7; color: #15803d; }
             .badge-danger { background: #fee2e2; color: #b91c1c; }
@@ -130,7 +122,6 @@ def index():
             .badge-purple { background: #f3e8ff; color: #6b21a8; }
             .badge-warning { background: #fef9c3; color: #a16207; }
 
-            /* Steuerungs-Formular */
             .control-panel select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none; margin-bottom: 12px; }
             .control-panel button { width: 100%; background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; transition: background 0.2s; }
             .control-panel button:hover { background: #059669; }
@@ -165,7 +156,6 @@ def index():
             </div>
 
             <div class="grid-container">
-                
                 <div>
                     <div class="card">
                         <div class="card-title">🗺️ Global Live-Map Tracking</div>
@@ -186,7 +176,6 @@ def index():
                         <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl senden</button>
                     </div>
                 </div>
-
             </div>
 
             <div class="card" style="margin-top: 5px;">
@@ -213,26 +202,15 @@ def index():
                     </table>
                 </div>
             </div>
-
         </div>
-
-        <script id="server-data" type="application/json">
-            %ERSATZ_FUER_DATEN%
-        </script>
 
         <script>
             let map;
             let markerMap = {};
             let linienMap = {};
-            let geraete = {};
             
-            // Absolut sicheres Auslesen ohne eval() oder Inline-Ersetzungsfehler
-            try {
-                const dataText = document.getElementById('server-data').textContent;
-                geraete = JSON.parse(dataText);
-            } catch(e) {
-                console.error("Daten konnten nicht initialisiert werden:", e);
-            }
+            // 🔥 FLASK NATIVER JINJA2 FILTER: Absolut immun gegen Syntax-Errors durch Anführungszeichen/Umlaute
+            let geraete = {{ daten_dict|tojson }};
             
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
 
@@ -413,8 +391,9 @@ def index():
         </script>
     </body>
     </html>
-    """.replace("%ERSATZ_FUER_DATEN%", json_daten)
-    return dashboard_html
+    """
+    # Verwendet Flasks Template Engine um das Wörterbuch nativ und ohne String-Konflikte zu rendern
+    return render_template_string(dashboard_html, daten_dict=sichere_daten)
 
 # ================= API ENDPUNKTE =================
 
