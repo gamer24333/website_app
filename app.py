@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import requests
 from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
 
@@ -10,12 +11,46 @@ CORS(app)
 app.secret_key = os.environ.get("SECRET_KEY", "ein_zufaelliger_geheimer_schluessel_123")
 GEHEIMES_PASSWORT = "192837465"
 
-# Speichert die Live-Daten der Geräte inklusive Historie
-geraete_daten = {}
+# ================= SUPABASE KONFIGURATION =================
+# TODO: Ersetze diese beiden Werte mit deinen echten Supabase-Daten!
+SUPABASE_URL = "https://chdjuipbtnmgbmsorhpe.supabase.co"
+SUPABASE_KEY = "sb_publishable_bwU_Ywvz9_Od8FPS12mk-w_bscgCvbe"
+# ==========================================================
+
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "resolution=merge-duplicates" # Erlaubt das Aktualisieren (Upsert)
+}
+
+def hole_daten_von_supabase():
+    """Lädt alle aktiven Geräte aus der Supabase-Datenbank."""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/geraete_daten?select=*"
+        antwort = requests.get(url, headers=SUPABASE_HEADERS, timeout=5)
+        if antwort.status_code == 200:
+            daten_liste = antwort.json()
+            # Umwandeln in das gewohnte Dictionary-Format für die Webseite
+            geraete_dict = {}
+            for geraet in daten_liste:
+                name = geraet["name"]
+                geraete_dict[name] = {
+                    "lat": float(geraet.get("lat", 51.1657)),
+                    "lon": float(geraet.get("lon", 10.4515)),
+                    "akku": str(geraet.get("akku", "??")),
+                    "netzwerk": str(geraet.get("netzwerk", "Aktiv")),
+                    "speed": str(geraet.get("speed", "0")),
+                    "historie": geraet.get("historie", []),
+                    "zeitstempel": int(geraet.get("zeitstempel", int(time.time())))
+                }
+            return geraete_dict
+    except Exception as e:
+        print(f"Fehler beim Laden aus Supabase: {e}")
+    return {}
 
 @app.route('/', methods=['GET'])
 def index():
-    global geraete_daten
     ist_eingeloggt = session.get('eingeloggt', False)
     
     login_html = ""
@@ -35,19 +70,7 @@ def index():
     karte_html = ""
     javascript_html = ""
     if ist_eingeloggt:
-        sichere_daten = {}
-        jetzt_ts = int(time.time())
-        for k, v in geraete_daten.items():
-            sichere_daten[k] = {
-                "lat": float(v.get("lat", 51.1657)),
-                "lon": float(v.get("lon", 10.4515)),
-                "akku": str(v.get("akku", "??")),
-                "netzwerk": str(v.get("netzwerk", "Unbekannt")),
-                "speed": str(v.get("speed", "0")),
-                "historie": v.get("historie", []),
-                "zeitstempel": int(v.get("zeitstempel", jetzt_ts))
-            }
-        
+        sichere_daten = hole_daten_von_supabase()
         json_daten = json.dumps(sichere_daten)
         
         karte_html = """
@@ -135,7 +158,6 @@ def index():
                     } else {
                         const marker = L.marker([info.lat, info.lon]).addTo(map).bindPopup(popupText);
                         markerMap[name] = marker;
-                        map.setView([info.lat, info.lon], 14);
                     }
 
                     if (info.historie && info.historie.length > 1) {
@@ -175,7 +197,6 @@ def index():
                     if (parseInt(info.akku) <= 20) akkuFarbe = "#dc3545";
                     else if (parseInt(info.akku) <= 50) akkuFarbe = "#ffc107";
                     
-                    // FIXED: onclick nutzt jetzt confirm() absolut ohne verschachtelte Text-Anführungszeichen
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
                             '<div>' +
                             '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
@@ -241,20 +262,7 @@ def index():
 def get_live_data():
     if not session.get('eingeloggt', False):
         return jsonify({}), 401
-    
-    sichere_daten = {}
-    jetzt_ts = int(time.time())
-    for k, v in geraete_daten.items():
-        sichere_daten[k] = {
-            "lat": float(v.get("lat", 51.1657)),
-            "lon": float(v.get("lon", 10.4515)),
-            "akku": str(v.get("akku", "??")),
-            "netzwerk": str(v.get("netzwerk", "Unbekannt")),
-            "speed": str(v.get("speed", "0")),
-            "historie": v.get("historie", []),
-            "zeitstempel": int(v.get("zeitstempel", jetzt_ts))
-        }
-    return jsonify(sichere_daten)
+    return jsonify(hole_daten_von_supabase())
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -273,13 +281,15 @@ def download_apk():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    global geraete_daten
     if not request.is_json:
         return jsonify({"error": "Missing JSON"}), 400
         
     data = request.get_json()
-    geraete_name = str(data.get("name", "Unbekanntes Gerät"))
     
+    roher_name = str(data.get("name", "Unbekanntes Gerät"))
+    absender_ip = request.remote_addr or "IP"
+    geraete_name = f"{roher_name} ({absender_ip[-4:]})"
+
     try:
         lat = float(data.get("lat"))
         lon = float(data.get("lon"))
@@ -290,31 +300,56 @@ def upload():
     netzwerk = str(data.get("netzwerk", "Unbekannt"))
     speed = str(data.get("speed", "0"))
     
-    if geraete_name not in geraete_daten:
-        historie = []
-    else:
-        historie = geraete_daten[geraete_name].get("historie", [])
+    # Vorherige Historie aus Supabase holen, falls das Gerät schon existiert
+    historie = []
+    try:
+        check_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}&select=historie"
+        res = requests.get(check_url, headers=SUPABASE_HEADERS, timeout=5)
+        if res.status_code == 200 and len(res.json()) > 0:
+            historie = res.json()[0].get("historie", [])
+    except Exception as e:
+        print(f"Fehler beim Historie-Abruf: {e}")
 
     historie.append([lat, lon])
-    if len(historie) > 10:
+    if len(historie) > 15:
         historie.pop(0)
 
-    geraete_daten[geraete_name] = {
-        "lat": lat, 
-        "lon": lon, 
+    # Payload für das Speichern in Supabase bauen
+    payload = {
+        "name": geraete_name,
+        "lat": lat,
+        "lon": lon,
         "akku": akku,
         "netzwerk": netzwerk,
         "speed": speed,
         "historie": historie,
         "zeitstempel": int(time.time())
     }
-    return jsonify({"status": "success"}), 200
+
+    # Überträgt die Daten zu Supabase (Erstellt neu oder überschreibt bei gleichem Namen)
+    try:
+        supabase_post_url = f"{SUPABASE_URL}/rest/v1/geraete_daten"
+        headers_upsert = SUPABASE_HEADERS.copy()
+        headers_upsert["Prefer"] = "resolution=merge-duplicates"
+        
+        response = requests.post(supabase_post_url, json=payload, headers=headers_upsert, timeout=5)
+        if response.status_code in [200, 201]:
+            return jsonify({"status": "success"}), 200
+        else:
+            print(f"Supabase Fehler-Antwort: {response.text}")
+            return jsonify({"error": "Supabase-Fehler"}), 500
+    except Exception as e:
+        print(f"Fehler beim Senden an Supabase: {e}")
+        return jsonify({"error": "Verbindungsfehler"}), 500
 
 @app.route('/delete/<name>', methods=['GET', 'POST'])
 def delete_device(name):
-    global geraete_daten
-    if session.get('eingeloggt', False) and name in geraete_daten:
-        del geraete_daten[name]
+    if session.get('eingeloggt', False):
+        try:
+            delete_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{name}"
+            requests.delete(delete_url, headers=SUPABASE_HEADERS, timeout=5)
+        except Exception as e:
+            print(f"Fehler beim Löschen in Supabase: {e}")
     return redirect(url_for('index'))
     
 if __name__ == '__main__':
