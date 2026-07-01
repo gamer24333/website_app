@@ -14,7 +14,7 @@ GEHEIMES_PASSWORT = "192837465"
 # ================= SUPABASE KONFIGURATION =================
 SUPABASE_URL = "https://chdjuipbtnmgbmsorhpe.supabase.co"
 # TODO: Ersetze diesen Key mit deinem kopierten Publishable Key aus dem Supabase-Dashboard!
-SUPABASE_KEY = "sb_publishable_bwU_Ywvz9_Od8FPS12mk-w_bscgCvbe"
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_bwU_Ywvz9_Od8FPS12mk-w_bscgCvbe")
 # ==========================================================
 
 SUPABASE_HEADERS = {
