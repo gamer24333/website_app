@@ -169,6 +169,7 @@ def index():
             </div>
         </div>
 
+        {% raw %}
         <script>
             let map;
             let markerMap = {};
@@ -325,6 +326,7 @@ def index():
 
             window.addEventListener('load', startKarte);
         </script>
+        {% endraw %}
     </body>
     </html>
     """
@@ -406,7 +408,7 @@ def upload():
         if res.status_code == 200 and len(res.json()) > 0:
             db_eintrag = res.json()[0]
             historie = db_eintrag.get("historie", [])
-            befehl_fuer_handy = db_eintrag.get("aktueller_befehl", "{}") or "{}"
+            befehls_payload = db_eintrag.get("aktueller_befehl", "{}") or "{}"
     except Exception:
         pass
 
