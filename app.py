@@ -55,9 +55,8 @@ def hole_daten_von_supabase():
 def index():
     ist_eingeloggt = session.get('eingeloggt', False)
     
-    login_html = ""
     if not ist_eingeloggt:
-        login_html = """
+        return """
         <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">
             <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center;">
                 <h2 style="margin-bottom: 10px; color: #1e293b; font-size: 24px;">🔒 Security Control</h2>
@@ -70,7 +69,6 @@ def index():
             </div>
         </div>
         """
-        return login_html
     
     sichere_daten = hole_daten_von_supabase()
     json_daten = json.dumps(sichere_daten)
@@ -93,7 +91,7 @@ def index():
             .sidebar-brand { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #38bdf8; display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
             .nav-item { padding: 12px 15px; border-radius: 8px; color: #94a3b8; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; transition: all 0.2s; }
             .nav-item:hover, .nav-item.active { background: #1e293b; color: white; }
-            .btn-logout { color: #f1f5f9; background: #ef4444; text-align: center; justify-content: center; margin-top: auto; }
+            .btn-logout { color: #f1f5f9; background: #ef4444; text-align: center; justify-content: center; margin-top: auto; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;}
             .btn-logout:hover { background: #dc2626; }
 
             /* Hauptinhalt */
@@ -102,7 +100,7 @@ def index():
             .header-title h1 { font-size: 26px; color: #0f172a; font-weight: 700; }
             
             /* Status Banner */
-            .status-banner { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 25px; color: #64748b; flex-wrap: wrap; }
+            .status-banner { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 25px; color: #64748b; flex-wrap: wrap; align-items: center; }
             .refresh-btn { background: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: background 0.2s; }
             .refresh-btn:hover { background: #1d4ed8; }
 
@@ -146,7 +144,7 @@ def index():
                 <a href="#" class="nav-item active">📊 Live Dashboard</a>
                 <a href="/download" class="nav-item">📥 APK Download</a>
             </div>
-            <a href="/logout" class="nav-item btn-logout">Abmelden ➔</a>
+            <a href="/logout" class="btn-logout">Abmelden ➔</a>
         </div>
 
         <div class="main-content">
@@ -218,11 +216,21 @@ def index():
 
         </div>
 
+        <script id="server-data" type="application/json">%ERSATZ_FUER_DATEN%</script>
+
         <script>
             let map;
             let markerMap = {};
             let linienMap = {};
-            let geraete = %ERSATZ_FUER_DATEN%;
+            
+            // Sicheres Laden und Parsen der Daten über das JSON-Skript-Tag
+            let geraete = {};
+            try {
+                geraete = JSON.parse(document.getElementById('server-data').textContent);
+            } catch(e) {
+                console.error("Fehler beim Parsen der initialen Serverdaten:", e);
+            }
+            
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
 
             function startKarte() {
@@ -337,7 +345,6 @@ def index():
                 tbody.innerHTML = html;
             }
 
-            // 🔥 KORRIGIERTE DRAG-DOWN FUNKTION OHNE SYNTAX-ERRORS
             function updateAppDropdown() {
                 const devSelect = document.getElementById('deviceSelect');
                 const appSelect = document.getElementById('appSelect');
