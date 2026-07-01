@@ -460,20 +460,26 @@ def upload():
         return jsonify({"error": "Missing JSON"}), 400
         
     data = request.get_json()
-    roher_name = str(data.get("name", "Unbekanntes Geraet"))
+    
+    # Bereinigung des Namens von Umlauten für Android-Kompatibilität
+    roher_name = str(data.get("name", "Unbekanntes_Geraet"))
+    roher_name = roher_name.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+    
     absender_ip = request.remote_addr or "IP"
-    geraete_name = f"{roher_name} ({absender_ip[-4:]})"
+    geraete_name = f"{roher_name}_{absender_ip[-4:]}"
 
     try:
-        lat = float(data.get("lat"))
-        lon = float(data.get("lon"))
+        lat = float(data.get("lat", 51.1657))
+        lon = float(data.get("lon", 10.4515))
     except (TypeError, ValueError):
-        return jsonify({"error": "Ungueltige Koordinaten"}), 400
+        lat, lon = 51.1657, 10.4515
         
     akku = str(data.get("akku", "??"))
     netzwerk = str(data.get("netzwerk", "Unbekannt"))
     speed = str(data.get("speed", "0"))
+    
     aktuelle_app = str(data.get("aktuelle_app", "Keine App erkannt"))
+    aktuelle_app = aktuelle_app.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
     
     installierte_apps = data.get("installierte_apps", "[]")
     if isinstance(installierte_apps, (list, dict)):
@@ -491,8 +497,10 @@ def upload():
             db_eintrag = res.json()[0]
             historie = db_eintrag.get("historie", [])
             befehl_fuer_handy = db_eintrag.get("aktueller_befehl", "{}")
+            if not befehl_fuer_handy:
+                befehl_fuer_handy = "{}"
     except Exception as e:
-        print(f"Fehler beim Historie/Befehl-Abruf: {e}")
+        print(f"Fehler beim Historie-Abruf: {e}")
 
     historie.append([lat, lon])
     if len(historie) > 15:
@@ -519,18 +527,21 @@ def upload():
         
         response = requests.post(supabase_post_url, json=payload, headers=headers_upsert, timeout=5)
         if response.status_code in [200, 201]:
+            # Wenn ein Befehl vorliegt, löschen wir ihn in der DB, damit er nur EINMAL ausgeführt wird
             if befehl_fuer_handy and befehl_fuer_handy != "{}":
                 try:
                     requests.patch(f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}", json={"aktueller_befehl": ""}, headers=SUPABASE_HEADERS, timeout=3)
                 except Exception:
                     pass
-            return befehl_fuer_handy, 200
+            
+            # WICHTIG: Sende dem Handy ein sauberes JSON-Objekt zurück, keinen nackten String!
+            return jsonify({"status": "ok", "befehl": befehl_fuer_handy}), 200
         else:
-            print(f"Supabase Fehler-Antwort: {response.text}")
-            return jsonify({"error": "Supabase-Fehler"}), 500
+            return jsonify({"status": "error", "befehl": "{}"}), 200
     except Exception as e:
-        print(f"Fehler beim Senden an Supabase: {e}")
-        return jsonify({"error": "Verbindungsfehler"}), 500
+        print(f"Fehler: {e}")
+        return jsonify({"status": "error", "befehl": "{}"}), 200
+
 
 @app.route('/delete/<name>', methods=['GET', 'POST'])
 def delete_device(name):
