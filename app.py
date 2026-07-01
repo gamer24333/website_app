@@ -199,6 +199,7 @@ def index():
                     if (parseInt(info.akku) <= 20) akkuFarbe = "#dc3545";
                     else if (parseInt(info.akku) <= 50) akkuFarbe = "#ffc107";
                     
+                    // KORREKTUR: target="_blank" entfernt, öffnet jetzt auf gleicher Seite
                     html += '<li style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;">' +
                             '<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">' +
                             '<b style="color: #007bff;">🟢 ' + name + '</b> ' +
@@ -210,8 +211,7 @@ def index():
                             '<span style="color: #6c757d;">📡 Funkspruch: <b>' + handyZeitText + '</b></span>' +
                             '</div>' +
                             '<div style="display: flex; gap: 10px;">' +
-                            '' +
-                            '<a href="/steuerung/' + encodeURIComponent(name) + '" target="_blank" style="background-color: #007bff; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">Steuerung 🛠️</a>' +
+                            '<a href="/steuerung/' + encodeURIComponent(name) + '" style="background-color: #007bff; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">Steuerung 🛠️</a>' +
                             '<a href="/delete/' + encodeURIComponent(name) + '" style="background-color: #dc3545; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;" onclick="return confirm(this.title);" title="Gerät wirklich löschen?">Löschen 🗑️</a>' +
                             '</div>' +
                             '</li>';
@@ -225,7 +225,7 @@ def index():
                     .then(response => { if (response.status === 401) { window.location.reload(); } return response.json(); })
                     .then(neueDaten => {
                         updateUI(neueDaten);
-                        leterAbrufZeitstempel = Math.floor(Date.now() / 1000);
+                        letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
                         const seitElem = document.getElementById('zeit-seit-update');
                         if(seitElem) seitElem.innerHTML = "⏱️ Letzter Webseiten-Abruf: Gerade eben";
                     })
@@ -266,7 +266,7 @@ def index():
     """
     return basis_html.replace("%LOGIN_BEREICH%", login_html).replace("%KARTE_BEREICH%", karte_html).replace("%JAVASCRIPT_BEREICH%", javascript_html)
 
-# ================= NEW: SEPARATE STEUERUNGS-SEITE =================
+# ================= SEPARATE STEUERUNGS-SEITE =================
 @app.route('/steuerung/<name>', methods=['GET'])
 def steuerungs_seite(name):
     if not session.get('eingeloggt', False):
@@ -279,11 +279,14 @@ def steuerungs_seite(name):
     geraet = alle_geraete[name]
     raw_apps = geraet.get("installierte_apps", "[]")
     
-    # Sicherstellen, dass das Format für JavaScript passt
+    # Sicherstellen, dass es für JavaScript als valide JSON-Zeichenkette übergeben wird
     if isinstance(raw_apps, str):
-        apps_json_string = raw_apps
+        apps_json_string = raw_apps if raw_apps.strip() else "[]"
     else:
         apps_json_string = json.dumps(raw_apps)
+
+    if apps_json_string == "[]" or not apps_json_string:
+        apps_json_string = "[]"
 
     html_steuerung = """
     <html>
@@ -297,7 +300,7 @@ def steuerungs_seite(name):
                 select { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #007bff; border-radius: 6px; margin: 20px 0; outline: none; }
                 button { width: 100%; background-color: #28a745; color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }
                 button:hover { background-color: #218838; }
-                .back-link { display: block; text-align: center; margin-top: 20px; color: #6c757d; text-decoration: none; font-weight: bold; }
+                .back-link { display: block; text-align: center; margin-top: 20px; color: #007bff; text-decoration: none; font-weight: bold; }
             </style>
         </head>
         <body>
@@ -315,15 +318,26 @@ def steuerungs_seite(name):
                 
                 <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl abschicken</button>
                 
-                <a href="javascript:window.close();" class="back-link">Fenster schließen 🚪</a>
+                <a href="/" class="back-link">↩️ Zurück zur Hauptseite</a>
             </div>
 
             <script>
-                const appListeRaw = %APPS_ARRAY%;
+                let appListeRaw = %APPS_ARRAY%;
                 const selectElement = document.getElementById('appSelect');
                 
+                // Falls als reiner String übergeben, hier parsen
+                if (typeof appListeRaw === 'string') {
+                    try {
+                        appListeRaw = JSON.parse(appListeRaw);
+                    } catch(e) {
+                        console.error("Fehler beim Parsen:", e);
+                        appListeRaw = [];
+                    }
+                }
+                
                 // Dropdown befüllen
-                if(appListeRaw && appListeRaw.length > 0) {
+                if(Array.isArray(appListeRaw) && appListeRaw.length > 0) {
+                    selectElement.innerHTML = '<option value="">-- Bitte App auswählen --</option>';
                     appListeRaw.forEach(app => {
                         const opt = document.createElement('option');
                         opt.value = app.paket;
@@ -331,10 +345,7 @@ def steuerungs_seite(name):
                         selectElement.appendChild(opt);
                     });
                 } else {
-                    const opt = document.createElement('option');
-                    opt.textContent = "Keine Apps vom Gerät gemeldet";
-                    opt.disabled = true;
-                    selectElement.appendChild(opt);
+                    selectElement.innerHTML = '<option disabled selected>Keine Apps vom Gerät gemeldet</option>';
                 }
 
                 function sendeRemoteBefehl() {
@@ -357,7 +368,7 @@ def steuerungs_seite(name):
                         .then(data => {
                             if(data.status === "success") {
                                 alert("Befehl gespeichert! Das Handy startet die App beim nächsten Funkspruch.");
-                                window.close();
+                                window.location.href = "/";
                             } else {
                                 alert("Fehler: " + data.error);
                             }
@@ -383,16 +394,15 @@ def speichere_befehl():
     geraete_name = data.get("name")
     ziel_paket = data.get("paket")
     
-    if not geraete_name or ziel_paket:
+    # KORREKTUR: logischen Ausdruck berichtigt und Python 'not' verwendet
+    if not geraete_name or not ziel_paket:
         return jsonify({"error": "Fehlende Parameter"}), 400
         
-    # Befehls-Format bauen, das deine Android-App in 'sendToServer' ausliest:{"befehl":"oeffne_app", "paket":"..."}
     befehls_payload = {
         "befehl": "oeffne_app",
         "paket": ziel_paket
     }
     
-    # Befehl in Supabase in die Spalte 'aktueller_befehl' schreiben
     try:
         supabase_update_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}"
         res = requests.patch(supabase_update_url, json={"aktueller_befehl": json.dumps(befehls_payload)}, headers=SUPABASE_HEADERS, timeout=5)
@@ -447,17 +457,15 @@ def upload():
     speed = str(data.get("speed", "0"))
     aktuelle_app = str(data.get("aktuelle_app", "Keine App erkannt"))
     
-    # 🔥 NEU: Die vom Handy gesendete App-Liste mit abfangen
     installierte_apps = data.get("installierte_apps", "[]")
     if isinstance(installierte_apps, (list, dict)):
         installierte_apps = json.dumps(installierte_apps)
-    
+        
     bedienungshilfen = "Aktiv" if aktuelle_app != "Keine App geöffnet" else "Inaktiv"
 
     historie = []
     befehl_fuer_handy = "{}"
     
-    # Bestehende Historie und anstehende Befehle prüfen
     try:
         check_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}&select=historie,aktueller_befehl"
         res = requests.get(check_url, headers=SUPABASE_HEADERS, timeout=5)
@@ -472,7 +480,6 @@ def upload():
     if len(historie) > 15:
         historie.pop(0)
 
-    # Payload für Supabase zusammenstellen
     payload = {
         "name": geraete_name,
         "lat": lat,
@@ -494,13 +501,11 @@ def upload():
         
         response = requests.post(supabase_post_url, json=payload, headers=headers_upsert, timeout=5)
         if response.status_code in [200, 201]:
-            # Wenn ein Befehl bereitlag, löschen wir ihn nach der Auslieferung direkt aus der DB
             if befehl_fuer_handy and befehl_fuer_handy != "{}":
                 try:
                     requests.patch(f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}", json={"aktueller_befehl": ""}, headers=SUPABASE_HEADERS, timeout=3)
                 except Exception:
                     pass
-            # Wir geben den Befehl als direkte Server-Antwort im JSON-Format zurück
             return befehl_fuer_handy, 200
         else:
             print(f"Supabase Fehler-Antwort: {response.text}")
