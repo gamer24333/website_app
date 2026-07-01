@@ -51,6 +51,13 @@ def hole_daten_von_supabase():
         print(f"Fehler beim Laden aus Supabase: {e}")
     return {}
 
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204  # Sendet "No Content", was den 404-Fehler im Browser unterdrückt
+
+
 @app.route('/', methods=['GET'])
 def index():
     ist_eingeloggt = session.get('eingeloggt', False)
