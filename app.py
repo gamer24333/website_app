@@ -178,14 +178,12 @@ def index():
             let kartenZentrierungErfolgt = false;
 
             function startKarte() {
-                // 🔥 CRASH-SCHUTZ: Falls Leaflet unvollständig geladen wurde, kurz warten und neustarten
                 if (typeof L === 'undefined') {
                     console.warn("Leaflet (L) ist noch nicht bereit. Warte kurz...");
                     setTimeout(startKarte, 100);
                     return;
                 }
 
-                // Behebt Leaflet-Icon Fehler
                 delete L.Icon.Default.prototype._getIconUrl;
                 L.Icon.Default.mergeOptions({
                     iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -325,7 +323,6 @@ def index():
                     }).catch(e => console.error("API-Abruffehler:", e));
             }
 
-            // Wartet, bis alle Ressourcen (auch externe Skripte) komplett da sind
             window.addEventListener('load', startKarte);
         </script>
     </body>
