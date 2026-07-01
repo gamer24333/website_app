@@ -76,8 +76,8 @@ def index():
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>HQ Control Center</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
         <style>
             * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
             body { background: #f8fafc; color: #1e293b; display: flex; height: 100vh; overflow: hidden; }
@@ -179,17 +179,17 @@ def index():
             let kartenZentrierungErfolgt = false;
 
             function startKarte() {
-                if (typeof L === 'undefined') {
+                if (typeof window.L === 'undefined' || typeof L === 'undefined') {
                     console.warn("Leaflet (L) ist noch nicht bereit. Warte kurz...");
-                    setTimeout(startKarte, 100);
+                    setTimeout(startKarte, 200);
                     return;
                 }
 
                 delete L.Icon.Default.prototype._getIconUrl;
                 L.Icon.Default.mergeOptions({
-                    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+                    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
                 });
 
                 map = L.map('map').setView([51.1657, 10.4515], 5);
@@ -408,7 +408,7 @@ def upload():
         if res.status_code == 200 and len(res.json()) > 0:
             db_eintrag = res.json()[0]
             historie = db_eintrag.get("historie", [])
-            befehls_payload = db_eintrag.get("aktueller_befehl", "{}") or "{}"
+            befehl_fuer_handy = db_eintrag.get("aktueller_befehl", "{}") or "{}"
     except Exception:
         pass
 
