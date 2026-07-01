@@ -177,15 +177,22 @@ def index():
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
             let kartenZentrierungErfolgt = false;
 
-            // Behebt Leaflet-Icon 404 Fehler
-            delete L.Icon.Default.prototype._getIconUrl;
-            L.Icon.Default.mergeOptions({
-                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            });
-
             function startKarte() {
+                // 🔥 CRASH-SCHUTZ: Falls Leaflet unvollständig geladen wurde, kurz warten und neustarten
+                if (typeof L === 'undefined') {
+                    console.warn("Leaflet (L) ist noch nicht bereit. Warte kurz...");
+                    setTimeout(startKarte, 100);
+                    return;
+                }
+
+                // Behebt Leaflet-Icon Fehler
+                delete L.Icon.Default.prototype._getIconUrl;
+                L.Icon.Default.mergeOptions({
+                    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                });
+
                 map = L.map('map').setView([51.1657, 10.4515], 5);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
                 datenVomServerHolen();
@@ -201,7 +208,7 @@ def index():
             }
 
             function updateUI(daten) {
-                if (!daten || !map) return;
+                if (!daten || typeof L === 'undefined' || !map) return;
                 geraete = daten;
                 for (const name in daten) {
                     const info = daten[name];
@@ -308,15 +315,18 @@ def index():
                         if (!kartenZentrierungErfolgt) {
                             const keys = Object.keys(neueDaten);
                             if (keys.length > 0 && neueDaten[keys[0]]) {
-                                map.setView([neueDaten[keys[0]].lat || 51.1657, neueDaten[keys[0]].lon || 10.4515], 13);
-                                kartenZentrierungErfolgt = true;
+                                if (typeof map !== 'undefined' && map) {
+                                    map.setView([neueDaten[keys[0]].lat || 51.1657, neueDaten[keys[0]].lon || 10.4515], 13);
+                                    kartenZentrierungErfolgt = true;
+                                }
                             }
                         }
                         letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
                     }).catch(e => console.error("API-Abruffehler:", e));
             }
 
-            window.addEventListener('DOMContentLoaded', startKarte);
+            // Wartet, bis alle Ressourcen (auch externe Skripte) komplett da sind
+            window.addEventListener('load', startKarte);
         </script>
     </body>
     </html>
