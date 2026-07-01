@@ -70,8 +70,6 @@ def index():
         </div>
         """
     
-    sichere_daten = hole_daten_von_supabase()
-    
     dashboard_html = """
     <!DOCTYPE html>
     <html lang="de">
@@ -209,29 +207,23 @@ def index():
             let markerMap = {};
             let linienMap = {};
             
-            // 🔥 DER FIX: '|tojson|safe' sorgt dafür, dass Flask den JSON-String unangetastet lässt und JS ihn sauber parst.
-            let geraete = {{ daten_dict|tojson|safe }};
-            
+            // Initialisierung als leeres Objekt, um Template-Injektionsfehler zu vermeiden
+            let geraete = {};
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
 
             function startKarte() {
+                // Standard-Zentrierung (Deutschland)
                 let centerLat = 51.1657;
                 let centerLon = 10.4515;
                 let zoomLevel = 5;
-
-                const keys = Object.keys(geraete);
-                if (keys.length > 0 && geraete[keys[0]]) {
-                    centerLat = geraete[keys[0]].lat || centerLat;
-                    centerLon = geraete[keys[0]].lon || centerLon;
-                    zoomLevel = 12;
-                }
 
                 map = L.map('map').setView([centerLat, centerLon], zoomLevel);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; OpenStreetMap'
                 }).addTo(map);
 
-                updateUI(geraete);
+                // Erste Datenabfrage direkt nach der Karteninitialisierung ausführen
+                datenVomServerHolen();
 
                 setInterval(function() {
                     const JETZT = Math.floor(Date.now() / 1000);
@@ -382,9 +374,18 @@ def index():
                     .then(response => { if (response.status === 401) { window.location.reload(); } return response.json(); })
                     .then(neueDaten => {
                         updateUI(neueDaten);
+                        
+                        // Dynamische Zentrierung der Karte beim ersten erfolgreichen Laden der Daten
+                        const keys = Object.keys(neueDaten);
+                        if (keys.length > 0 && neueDaten[keys[0]]) {
+                            let centerLat = neueDaten[keys[0]].lat || 51.1657;
+                            let centerLon = neueDaten[keys[0]].lon || 10.4515;
+                            map.setView([centerLat, centerLon], 12);
+                        }
+                        
                         letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
                         document.getElementById('zeit-seit-update').innerHTML = "⏱&FE0F; Letzter Webseiten-Abruf: Gerade eben";
-                    });
+                    }).catch(err => console.error("Fehler beim Abruf der Live-Daten:", err));
             }
 
             window.addEventListener('DOMContentLoaded', startKarte);
@@ -392,8 +393,7 @@ def index():
     </body>
     </html>
     """
-    return render_template_string(dashboard_html, daten_dict=sichere_daten)
-
+    return render_template_string(dashboard_html)
 # ================= API ENDPUNKTE =================
 
 @app.route('/api/sende_befehl', methods=['POST'])
