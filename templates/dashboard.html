@@ -39,8 +39,11 @@
         .badge-purple { background: #f3e8ff; color: #6b21a8; }
         .badge-warning { background: #fef9c3; color: #a16207; }
         .control-panel select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none; margin-bottom: 12px; }
-        .control-panel button { width: 100%; background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; transition: background 0.2s; }
-        .control-panel button:hover { background: #059669; }
+        .control-panel button { width: 100%; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; transition: background 0.2s; margin-bottom: 10px; }
+        .btn-start { background: #10b981; }
+        .btn-start:hover { background: #059669; }
+        .btn-block { background: #ef4444; }
+        .btn-block:hover { background: #dc2626; }
     </style>
 </head>
 <body>
@@ -72,10 +75,12 @@
             <div><div class="card"><div class="card-title">🗺️ Global Live-Map Tracking</div><div id="map"></div></div></div>
             <div>
                 <div class="card control-panel">
-                    <div class="card-title">🛠️ Live App-Fernsteuerung</div>
+                    <div class="card-title">🛠️ Live App-Steuerung & Sperren</div>
                     <select id="deviceSelect" onchange="updateAppDropdown()"><option value="">-- Ger&auml;t ausw&auml;hlen --</option></select>
                     <select id="appSelect" disabled><option value="">-- Zuerst Ger&auml;t w&auml;hlen --</option></select>
-                    <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl senden</button>
+                    
+                    <button onclick="sendeRemoteBefehl('oeffne_app')" class="btn-start">🚀 App-Startbefehl senden</button>
+                    <button onclick="sendeRemoteBefehl('sperre_app')" class="btn-block">🚫 Ausgew&auml;hlte App sperren</button>
                 </div>
             </div>
         </div>
@@ -221,18 +226,21 @@
             } else { appSelect.innerHTML = '<option disabled selected>Keine Apps gemeldet</option>'; }
         }
 
-        function sendeRemoteBefehl() {
+        // Unterstützt jetzt dynamisch den Typ 'oeffne_app' oder 'sperre_app'
+        function sendeRemoteBefehl(typ) {
             const geraeteName = document.getElementById('deviceSelect').value;
             const paketName = document.getElementById('appSelect').value;
-            if (!geraeteName || !paketName) { alert("Bitte ausw&auml;hlen!"); return; }
-            if (confirm("App-Startbefehl senden?")) {
+            if (!geraeteName || !paketName) { alert("Bitte Gerät und App auswählen!"); return; }
+            
+            let nachricht = typ === 'sperre_app' ? "Möchtest du diese App wirklich sperren?" : "App-Startbefehl senden?";
+            if (confirm(nachricht)) {
                 fetch('/api/sende_befehl', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: geraeteName, paket: paketName })
+                    body: JSON.stringify({ name: geraeteName, paket: paketName, befehl_typ: typ })
                 })
                 .then(res => res.json())
-                .then(data => { if (data.status === "success") { alert("Erfolgreich gespeichert!"); } });
+                .then(data => { if (data.status === "success") { alert("Befehl erfolgreich an Warteschlange übermittelt!"); } });
             }
         }
 
