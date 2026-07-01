@@ -24,7 +24,7 @@ SUPABASE_HEADERS = {
 }
 
 def hole_daten_von_supabase():
-    """Lädt alle aktiven Geräte aus der Supabase-Datenbank."""
+    """L&auml;dt alle aktiven Ger&auml;te aus der Supabase-Datenbank."""
     try:
         url = f"{SUPABASE_URL}/rest/v1/geraete_daten?select=*"
         antwort = requests.get(url, headers=SUPABASE_HEADERS, timeout=5)
@@ -209,8 +209,8 @@ def index():
             let markerMap = {};
             let linienMap = {};
             
-            // 🔥 FLASK NATIVER JINJA2 FILTER: Absolut immun gegen Syntax-Errors durch Anführungszeichen/Umlaute
-            let geraete = {{ daten_dict|tojson }};
+            // 🔥 DER FIX: '|tojson|safe' sorgt dafür, dass Flask den JSON-String unangetastet lässt und JS ihn sauber parst.
+            let geraete = {{ daten_dict|tojson|safe }};
             
             let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
 
@@ -392,7 +392,6 @@ def index():
     </body>
     </html>
     """
-    # Verwendet Flasks Template Engine um das Wörterbuch nativ und ohne String-Konflikte zu rendern
     return render_template_string(dashboard_html, daten_dict=sichere_daten)
 
 # ================= API ENDPUNKTE =================
@@ -450,7 +449,7 @@ def upload():
         return jsonify({"error": "Missing JSON"}), 400
         
     data = request.get_json()
-    roher_name = str(data.get("name", "Unbekanntes Ger&auml;t"))
+    roher_name = str(data.get("name", "Unbekanntes Geraet"))
     absender_ip = request.remote_addr or "IP"
     geraete_name = f"{roher_name} ({absender_ip[-4:]})"
 
@@ -458,7 +457,7 @@ def upload():
         lat = float(data.get("lat"))
         lon = float(data.get("lon"))
     except (TypeError, ValueError):
-        return jsonify({"error": "Ung&uuml;ltige Koordinaten"}), 400
+        return jsonify({"error": "Ungueltige Koordinaten"}), 400
         
     akku = str(data.get("akku", "??"))
     netzwerk = str(data.get("netzwerk", "Unbekannt"))
@@ -469,7 +468,7 @@ def upload():
     if isinstance(installierte_apps, (list, dict)):
         installierte_apps = json.dumps(installierte_apps)
         
-    bedienungshilfen = "Aktiv" if aktuelle_app != "Keine App ge&ouml;ffnet" else "Inaktiv"
+    bedienungshilfen = "Aktiv" if aktuelle_app != "Keine App geoeffnet" else "Inaktiv"
 
     historie = []
     befehl_fuer_handy = "{}"
@@ -529,7 +528,7 @@ def delete_device(name):
             delete_url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{name}"
             requests.delete(delete_url, headers=SUPABASE_HEADERS, timeout=5)
         except Exception as e:
-            print(f"Fehler beim L&ouml;schen in Supabase: {e}")
+            print(f"Fehler beim Loeschen in Supabase: {e}")
     return redirect(url_for('index'))
     
 if __name__ == '__main__':
