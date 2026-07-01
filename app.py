@@ -77,8 +77,10 @@ def speichere_befehl():
     data = request.get_json() or {}
     geraete_name = data.get("name")
     ziel_paket = data.get("paket")
+    # 'oeffne_app' oder 'sperre_app' aus dem Webinterface empfangen
+    befehl_typ = data.get("befehl_typ", "oeffne_app") 
     
-    befehls_payload = {"befehl": "oeffne_app", "paket": ziel_paket}
+    befehls_payload = {"befehl": befehl_typ, "paket": ziel_paket}
     try:
         url = f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}"
         res = requests.patch(url, json={"aktueller_befehl": json.dumps(befehls_payload)}, headers=SUPABASE_HEADERS, timeout=5)
@@ -113,7 +115,6 @@ def download_apk():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    # Absicherung: Wenn kein gültiges JSON gesendet wird, schicke JSON zurück statt HTML
     if not request.is_json:
         return jsonify({"status": "error", "message": "Missing JSON", "befehl": "{}"}), 400
         
@@ -151,8 +152,10 @@ def upload():
         except Exception:
             pass
 
-        historie.append([lat, lon])
-        if len(historie) > 15: historie.pop(0)
+    # Historie erweitern
+        if [lat, lon] != [51.1657, 10.4515]:
+            historie.append([lat, lon])
+            if len(historie) > 15: historie.pop(0)
 
         payload = {
             "name": geraete_name, "lat": lat, "lon": lon, "akku": akku, "netzwerk": netzwerk,
@@ -166,8 +169,9 @@ def upload():
         res = requests.post(url, json=payload, headers=headers_upsert, timeout=5)
         
         if res.status_code in [200, 201]:
-            if befehl_fuer_handy != "{}":
+            if befehl_fuer_handy and befehl_fuer_handy != "{}":
                 try: 
+                    # Setze Befehl nach erfolgreicher Übermittlung zurück
                     requests.patch(f"{SUPABASE_URL}/rest/v1/geraete_daten?name=eq.{geraete_name}", json={"aktueller_befehl": ""}, headers=SUPABASE_HEADERS, timeout=3)
                 except Exception: 
                     pass
@@ -177,7 +181,6 @@ def upload():
         
     except Exception as e:
         print(f"Kritischer Android-Upload-Fehler abgefangen: {e}")
-        # Notfall-JSON-Antwort, damit die App nicht crasht
         return jsonify({"status": "error", "befehl": "{}"}), 200
 
 @app.route('/delete/<name>', methods=['GET', 'POST'])
@@ -191,4 +194,3 @@ def delete_device(name):
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
-    
