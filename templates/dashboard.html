@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HQ Control Center</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background: #f8fafc; color: #1e293b; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 260px; background: #0f172a; color: white; padding: 25px 20px; display: flex; flex-direction: column; justify-content: space-between; }
+        .sidebar-brand { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #38bdf8; display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
+        .nav-item { padding: 12px 15px; border-radius: 8px; color: #94a3b8; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; transition: all 0.2s; }
+        .nav-item:hover, .nav-item.active { background: #1e293b; color: white; }
+        .btn-logout { color: #f1f5f9; background: #ef4444; text-align: center; justify-content: center; margin-top: auto; padding: 12px; border-radius: 8px; font-weight: 600; text-decoration: none;}
+        .btn-logout:hover { background: #dc2626; }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 30px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+        .header-title h1 { font-size: 26px; color: #0f172a; font-weight: 700; }
+        .status-banner { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 25px; color: #64748b; flex-wrap: wrap; align-items: center; }
+        .refresh-btn { background: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: background 0.2s; }
+        .refresh-btn:hover { background: #1d4ed8; }
+        .grid-container { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
+        @media (max-width: 900px) { .grid-container { grid-template-columns: 1fr; } }
+        .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 25px; }
+        .card-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
+        #map { height: 450px; width: 100%; border-radius: 10px; background: #e2e8f0; border: 1px solid #cbd5e1; }
+        .download-box { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; }
+        .btn-download { display: inline-block; background: white; color: #0369a1; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .btn-download:hover { transform: translateY(-1px); }
+        .device-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        .device-table th { background: #f8fafc; color: #64748b; font-weight: 600; padding: 12px; border-bottom: 2px solid #e2e8f0; }
+        .device-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+        .badge-success { background: #dcfce7; color: #15803d; }
+        .badge-danger { background: #fee2e2; color: #b91c1c; }
+        .badge-info { background: #e0f2fe; color: #0369a1; }
+        .badge-purple { background: #f3e8ff; color: #6b21a8; }
+        .badge-warning { background: #fef9c3; color: #a16207; }
+        .control-panel select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none; margin-bottom: 12px; }
+        .control-panel button { width: 100%; background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+        .control-panel button:hover { background: #059669; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div>
+            <div class="sidebar-brand">📡 SYSTEM CONTROL</div>
+            <a href="#" class="nav-item active">📊 Live Dashboard</a>
+            <a href="/download" class="nav-item">📥 APK Download</a>
+        </div>
+        <a href="/logout" class="btn-logout">Abmelden ➔</a>
+    </div>
+
+    <div class="main-content">
+        <div class="header-bar">
+            <div class="header-title"><h1>Echtzeit &Uuml;berwachungs-Zentrale</h1></div>
+            <div class="card download-box" style="margin: 0; padding: 12px 20px; display: flex; align-items: center; gap: 15px;">
+                <span style="font-size: 14px; font-weight: 600;">System-Client installieren:</span>
+                <a href="/download" class="btn-download">📥 APK Download</a>
+            </div>
+        </div>
+
+        <div class="status-banner">
+            <div id="zeit-seit-update" style="flex: 1;">⏱️ Letzter Webseiten-Abruf: Gerade eben</div>
+            <div id="zeit-bis-update" style="width: 220px;">🔄 Nächstes Live-Update in: 00:05</div>
+            <button onclick="datenVomServerHolen()" class="refresh-btn">Jetzt aktualisieren ⚡</button>
+        </div>
+
+        <div class="grid-container">
+            <div><div class="card"><div class="card-title">🗺️ Global Live-Map Tracking</div><div id="map"></div></div></div>
+            <div>
+                <div class="card control-panel">
+                    <div class="card-title">🛠️ Live App-Fernsteuerung</div>
+                    <select id="deviceSelect" onchange="updateAppDropdown()"><option value="">-- Ger&auml;t ausw&auml;hlen --</option></select>
+                    <select id="appSelect" disabled><option value="">-- Zuerst Ger&auml;t w&auml;hlen --</option></select>
+                    <button onclick="sendeRemoteBefehl()">🚀 App-Startbefehl senden</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 5px;">
+            <div class="card-title">📱 Registrierte Ger&auml;te</div>
+            <div style="overflow-x: auto;">
+                <table class="device-table">
+                    <thead>
+                        <tr>
+                            <th>Status/Name</th><th>Akku</th><th>Tempo</th><th>Netzwerk</th><th>Letzter Abfang-Status</th><th>Systemhilfe</th><th>Funkspruch</th><th style="text-align: right;">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="device-table-body">
+                        <tr><td colspan="8" style="text-align: center; color: #94a3b8; font-style: italic; padding: 30px;">Warte auf Daten...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let markerMap = {};
+        let linienMap = {};
+        let geraete = {};
+        let letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
+        let kartenZentrierungErfolgt = false;
+
+        function startKarte() {
+            if (typeof window.L === 'undefined' || typeof L === 'undefined') {
+                console.warn("Leaflet (L) ist noch nicht bereit. Warte kurz...");
+                setTimeout(startKarte, 200);
+                return;
+            }
+
+            delete L.Icon.Default.prototype._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+                iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            });
+
+            map = L.map('map').setView([51.1657, 10.4515], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+            datenVomServerHolen();
+
+            setInterval(function() {
+                const JETZT = Math.floor(Date.now() / 1000);
+                let sekundenSeitUpdate = JETZT - letzterAbrufZeitstempel;
+                let sekundenBisUpdate = 5 - sekundenSeitUpdate;
+                if (sekundenBisUpdate <= 0) { datenVomServerHolen(); return; }
+                document.getElementById('zeit-seit-update').innerHTML = "⏱️ Letzter Webseiten-Abruf: vor " + sekundenSeitUpdate + " Sek.";
+                document.getElementById('zeit-bis-update').innerHTML = "🔄 Nächstes Live-Update in: 00:0" + sekundenBisUpdate;
+            }, 1000);
+        }
+
+        function updateUI(daten) {
+            if (!daten || typeof L === 'undefined' || !map) return;
+            geraete = daten;
+            for (const name in daten) {
+                const info = daten[name];
+                if (!info.lat || !info.lon) continue;
+                const popupText = "<b>" + name + "</b><br>🔋 Akku: " + info.akku + "%<br>📱 Status: " + info.aktuelle_app;
+                if (markerMap[name]) {
+                    markerMap[name].setLatLng([info.lat, info.lon]);
+                    markerMap[name].getPopup().setContent(popupText);
+                } else {
+                    markerMap[name] = L.marker([info.lat, info.lon]).addTo(map).bindPopup(popupText);
+                }
+                if (info.historie && info.historie.length > 1) {
+                    if (linienMap[name]) { map.removeLayer(linienMap[name]); }
+                    linienMap[name] = L.polyline(info.historie, {color: '#2563eb', weight: 4, opacity: 0.6}).addTo(map);
+                }
+            }
+
+            const devSelect = document.getElementById('deviceSelect');
+            const aktuellerWert = devSelect.value;
+            devSelect.innerHTML = '<option value="">-- Ger&auml;t ausw&auml;hlen --</option>';
+            for (const name in daten) {
+                const opt = document.createElement('option'); opt.value = name; opt.textContent = name;
+                if(name === aktuellerWert) opt.selected = true;
+                devSelect.appendChild(opt);
+            }
+            if(devSelect.value) { updateAppDropdown(); }
+
+            const tbody = document.getElementById('device-table-body');
+            if (Object.keys(daten).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 20px;">Keine Ger&auml;te aktiv</td></tr>';
+                return;
+            }
+
+            let html = "";
+            const jetzt = Math.floor(Date.now() / 1000);
+            for (const name in daten) {
+                const info = daten[name];
+                const diff = jetzt - (info.zeitstempel || jetzt);
+                let zeitText = diff < 60 ? "vor " + diff + " Sek." : "vor " + Math.floor(diff / 60) + " Min.";
+                let akkuKlasse = "badge-success";
+                if (parseInt(info.akku) <= 20) akkuKlasse = "badge-danger";
+                let appBadgeHTML = "";
+                let roherText = info.aktuelle_app || "Keine";
+                
+                if(roherText.includes("[BLOCKIERT]")) {
+                    appBadgeHTML = '<span class="badge badge-danger">🚫 Sperre</span> <small>' + roherText.replace("[BLOCKIERT] ","") + '</small>';
+                } else if(roherText.includes("[🔔 PUSH")) {
+                    let teile = roherText.split("]: ");
+                    let inhalt = teile[1] || roherText;
+                    appBadgeHTML = '<span class="badge badge-purple">🔔 Push</span> <small>' + inhalt + '</small>';
+                } else {
+                    appBadgeHTML = '<span class="badge badge-info">' + roherText + '</span>';
+                }
+
+                html += '<tr>';
+                html += '<td><strong>🟢 ' + name + '</strong></td>';
+                html += '<td><span class="badge ' + akkuKlasse + '">' + info.akku + '%</span></td>';
+                html += '<td><span class="badge badge-info">' + info.speed + ' km/h</span></td>';
+                html += '<td><span class="badge badge-warning">' + info.netzwerk + '</span></td>';
+                html += '<td>' + appBadgeHTML + '</td>';
+                html += '<td><span class="badge badge-success">♿ ' + info.bedienungshilfen + '</span></td>';
+                html += '<td><small>' + zeitText + '</small></td>';
+                html += '<td style="text-align: right;"><a href="/delete/' + encodeURIComponent(name) + '" class="badge badge-danger" style="text-decoration:none;" onclick="return confirm(\'L&ouml;schen?\');">🗑</a></td>';
+                html += '</tr>';
+            }
+            tbody.innerHTML = html;
+        }
+
+        function updateAppDropdown() {
+            const devSelect = document.getElementById('deviceSelect');
+            const appSelect = document.getElementById('appSelect');
+            const gewaehltesGeraet = devSelect.value;
+            if (!gewaehltesGeraet || !geraete[gewaehltesGeraet]) {
+                appSelect.innerHTML = '<option value="">-- Zuerst Ger&auml;t w&auml;hlen --</option>'; appSelect.disabled = true; return;
+            }
+            appSelect.disabled = false;
+            let appsRaw = geraete[gewaehltesGeraet].installierte_apps;
+            if (typeof appsRaw === 'string') { try { appsRaw = JSON.parse(appsRaw); } catch(e) { appsRaw = []; } }
+            if (Array.isArray(appsRaw) && appsRaw.length > 0) {
+                appSelect.innerHTML = '<option value="">-- Bitte App ausw&auml;hlen --</option>';
+                appsRaw.forEach(app => {
+                    const opt = document.createElement('option'); opt.value = app.paket; opt.textContent = app.name; appSelect.appendChild(opt);
+                });
+            } else { appSelect.innerHTML = '<option disabled selected>Keine Apps gemeldet</option>'; }
+        }
+
+        function sendeRemoteBefehl() {
+            const geraeteName = document.getElementById('deviceSelect').value;
+            const paketName = document.getElementById('appSelect').value;
+            if (!geraeteName || !paketName) { alert("Bitte ausw&auml;hlen!"); return; }
+            if (confirm("App-Startbefehl senden?")) {
+                fetch('/api/sende_befehl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: geraeteName, paket: paketName })
+                })
+                .then(res => res.json())
+                .then(data => { if (data.status === "success") { alert("Erfolgreich gespeichert!"); } });
+            }
+        }
+
+        function datenVomServerHolen() {
+            fetch('/api/data')
+                .then(response => { if (response.status === 401) { window.location.reload(); } return response.json(); })
+                .then(neueDaten => {
+                    updateUI(neueDaten);
+                    if (!kartenZentrierungErfolgt) {
+                        const keys = Object.keys(neueDaten);
+                        if (keys.length > 0 && neueDaten[keys[0]]) {
+                            if (typeof map !== 'undefined' && map) {
+                                map.setView([neueDaten[keys[0]].lat || 51.1657, neueDaten[keys[0]].lon || 10.4515], 13);
+                                kartenZentrierungErfolgt = true;
+                            }
+                        }
+                    }
+                    letzterAbrufZeitstempel = Math.floor(Date.now() / 1000);
+                }).catch(e => console.error("API-Abruffehler:", e));
+        }
+
+        window.addEventListener('load', startKarte);
+    </script>
+</body>
+</html>
