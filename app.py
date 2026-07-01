@@ -383,7 +383,7 @@ def speichere_befehl():
     geraete_name = data.get("name")
     ziel_paket = data.get("paket")
     
-    if not geraete_name or !ziel_paket:
+    if not geraete_name or ziel_paket:
         return jsonify({"error": "Fehlende Parameter"}), 400
         
     # Befehls-Format bauen, das deine Android-App in 'sendToServer' ausliest:{"befehl":"oeffne_app", "paket":"..."}
