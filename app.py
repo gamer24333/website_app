@@ -72,7 +72,6 @@ def index():
         """
         return login_html
     
-    # Wenn eingeloggt, rendern wir das moderne Dashboard UI
     sichere_daten = hole_daten_von_supabase()
     json_daten = json.dumps(sichere_daten)
     
@@ -81,6 +80,7 @@ def index():
     <html lang="de">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>HQ Control Center</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -98,16 +98,18 @@ def index():
 
             /* Hauptinhalt */
             .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 30px; }
-            .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+            .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
             .header-title h1 { font-size: 26px; color: #0f172a; font-weight: 700; }
             
             /* Status Banner */
-            .status-banner { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 25px; color: #64748b; }
+            .status-banner { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; font-size: 14px; margin-bottom: 25px; color: #64748b; flex-wrap: wrap; }
             .refresh-btn { background: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: background 0.2s; }
             .refresh-btn:hover { background: #1d4ed8; }
 
             /* Grid Layout */
             .grid-container { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
+            @media (max-width: 900px) { .grid-container { grid-template-columns: 1fr; } }
+            
             .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 25px; }
             .card-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
             
@@ -242,7 +244,6 @@ def index():
 
                 updateUI(geraete);
 
-                // Automatischer Countdown-Timer (5 Sekunden Takt)
                 setInterval(function() {
                     const JETZT = Math.floor(Date.now() / 1000);
                     let sekundenSeitUpdate = JETZT - letzterAbrufZeitstempel;
@@ -262,7 +263,6 @@ def index():
                 if (!daten || !map) return;
                 geraete = daten;
                 
-                // 1. Karten-Marker aktualisieren
                 for (const name in daten) {
                     const info = daten[name];
                     if (!info.lat || !info.lon) continue;
@@ -282,7 +282,6 @@ def index():
                     }
                 }
 
-                // 2. Dropdown für Fernsteuerung befüllen (nur wenn sich die Anzahl ändert)
                 const devSelect = document.getElementById('deviceSelect');
                 const aktuellerWert = devSelect.value;
                 devSelect.innerHTML = '<option value="">-- Gerät auswählen --</option>';
@@ -295,7 +294,6 @@ def index():
                 }
                 if(devSelect.value) { updateAppDropdown(); }
 
-                // 3. Tabelle generieren
                 const tbody = document.getElementById('device-table-body');
                 const keys = Object.keys(daten);
                 if (keys.length === 0) {
@@ -311,12 +309,10 @@ def index():
                     const diff = jetzt - (info.zeitstempel || jetzt);
                     let zeitText = diff < 60 ? "vor " + diff + " Sek." : "vor " + Math.floor(diff / 60) + " Min.";
 
-                    // Akku Badge Farbe festlegen
                     let akkuKlasse = "badge-success";
                     if (parseInt(info.akku) <= 20) akkuKlasse = "badge-danger";
                     else if (parseInt(info.akku) <= 50) akkuKlasse = "badge-warning";
 
-                    // Dynamische Abfang-Badges je nach Typ (Block, Push oder normale App)
                     let appBadgeHTML = "";
                     let roherText = info.aktuelle_app;
                     if(roherText.includes("[BLOCKIERT]")) {
@@ -341,6 +337,7 @@ def index():
                 tbody.innerHTML = html;
             }
 
+            // 🔥 KORRIGIERTE DRAG-DOWN FUNKTION OHNE SYNTAX-ERRORS
             function updateAppDropdown() {
                 const devSelect = document.getElementById('deviceSelect');
                 const appSelect = document.getElementById('appSelect');
@@ -365,7 +362,7 @@ def index():
                         appSelect.appendChild(opt);
                     });
                 } else {
-                    appSelect.innerHTML = '<option disabled selected>Keine Apps vom Gerät gemeldet</option>';
+                    appSelect.innerHTML = '<option disabled selected>Keine Apps gemeldet</option>';
                 }
             }
 
@@ -409,7 +406,7 @@ def index():
     """.replace("%ERSATZ_FUER_DATEN%", json_daten)
     return dashboard_html
 
-# ================= API ENDPUNKTE & HILFSFUNKTIONEN =================
+# ================= API ENDPUNKTE =================
 
 @app.route('/api/sende_befehl', methods=['POST'])
 def speichere_befehl():
